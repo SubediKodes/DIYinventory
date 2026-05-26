@@ -3027,7 +3027,7 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
     if (initial) {
       setForm({ name: initial.name || "", cat: initial.cat || "resistor", qty: initial.qty || 0, min: initial.min || 1, loc: initial.loc || "", mfg: initial.mfg || "", mpn: initial.mpn || "", value: initial.value || "", pkg: initial.pkg || "", notes: initial.notes || "", price: initial.price || 0, imageUrl: initial.imageUrl || "", datasheetUrl: initial.datasheetUrl || "" });
     } else {
-      setForm({ name: initialName || "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "" });
+      setForm({ name: initialName || "", cat: "resistor", qty: 0, min: 0, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "" });
     }
   }, [open]);
   if (!open) return null;
