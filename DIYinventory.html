@@ -3452,18 +3452,16 @@ function App() {
       tol: "—",
       ...form,
     }, ...arr]);
-    setPendingBomProject(pending => {
-      if (pending) {
-        setProjects(arr => arr.map(p => p.id === pending.projectId
-          ? { ...p, bom: [...p.bom, { partId: id, need: 1 }], updated: "just now" }
-          : p));
-        addToast({ title: "Part created and added to BOM", desc: form.name });
-        return null;
-      }
+    if (pendingBomProject) {
+      setProjects(arr => arr.map(p => p.id === pendingBomProject.projectId
+        ? { ...p, bom: [...p.bom, { partId: id, need: 1 }], updated: "just now" }
+        : p));
+      setPendingBomProject(null);
+      addToast({ title: "Part created and added to BOM", desc: form.name });
+    } else {
       addToast({ title: "Part created", desc: form.name });
-      return null;
-    });
-  }, [addToast]);
+    }
+  }, [addToast, pendingBomProject]);
 
   const createProject = useCallback((form) => {
     const id = "proj-" + Math.random().toString(36).slice(2, 7);
