@@ -2776,7 +2776,7 @@ function ProjectChip({ status }) {
   return <span className={"chip " + (m[status] || "")}>{status}</span>;
 }
 
-function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEdit, onAddBomLine, onRemoveBomLine }) {
+function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEdit, onAddBomLine, onRemoveBomLine, onCreateNewPartForBom }) {
   const [bomOpen, setBomOpen] = React.useState(false);
   const existingIds = new Set(project.bom.map(b => b.partId));
 
@@ -2900,6 +2900,7 @@ function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEd
         parts={parts}
         existingIds={existingIds}
         onAdd={(partId, need) => { onAddBomLine(project.id, partId, need); addToast({ title: "Part added to BOM" }); }}
+        onCreateNew={(name) => onCreateNewPartForBom(project.id, name)}
       />
     </div>
   );
@@ -2917,11 +2918,11 @@ function StatCardMini({ label, value, sub, good }) {
 
 // ---------- Add Part Drawer ----------
 
-function AddPartDrawer({ open, onClose, onCreate }) {
+function AddPartDrawer({ open, onClose, onCreate, initialName }) {
   const [form, setForm] = useState({
     name: "", cat: "resistor", qty: 0, min: 1, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "",
   });
-  useEffect(() => { if (open) setForm({ name: "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "" }); }, [open]);
+  useEffect(() => { if (open) setForm({ name: initialName || "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "" }); }, [open]);
   if (!open) return null;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const flatLocs = Object.values(LOC_INDEX);
@@ -3053,7 +3054,7 @@ function AddProjectDrawer({ open, onClose, onCreate, onUpdate, initial }) {
 
 // ---------- Add BOM Line Drawer ----------
 
-function AddBomLineDrawer({ open, onClose, parts, existingIds, onAdd }) {
+function AddBomLineDrawer({ open, onClose, parts, existingIds, onAdd, onCreateNew }) {
   const [query, setQuery] = React.useState("");
   const [selected, setSelected] = React.useState(null);
   const [need, setNeed] = React.useState(1);
@@ -3103,7 +3104,16 @@ function AddBomLineDrawer({ open, onClose, parts, existingIds, onAdd }) {
           <div style={{ flex: 1, overflowY: "auto" }}>
             {filtered.length === 0 && (
               <div style={{ padding: 32, textAlign: "center", color: "var(--text-faint)", fontSize: 13 }}>
-                {query ? "No matching parts" : "All parts already in BOM"}
+                <div>{query ? "No matching parts in inventory" : "All inventory parts already in BOM"}</div>
+                {query && (
+                  <button
+                    className="btn primary"
+                    style={{ marginTop: 12 }}
+                    onClick={() => { onClose(); onCreateNew(query); }}
+                  >
+                    <span className="icon">{icons.plus}</span> Create "{query}" and add to BOM
+                  </button>
+                )}
               </div>
             )}
             {filtered.map(p => {
@@ -3129,6 +3139,16 @@ function AddBomLineDrawer({ open, onClose, parts, existingIds, onAdd }) {
               );
             })}
           </div>
+
+          {filtered.length > 0 && (
+            <div style={{ padding: "8px 18px", borderTop: "1px dashed var(--border)" }}>
+              <button className="btn ghost sm" style={{ width: "100%", color: "var(--text-muted)" }}
+                onClick={() => { onClose(); onCreateNew(query); }}>
+                <span className="icon">{icons.plus}</span>
+                {query ? `Create "${query}" as new part` : "Create a new part in inventory"}
+              </button>
+            </div>
+          )}
 
           {sel && (
             <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", background: "var(--bg-sunk)", display: "flex", alignItems: "center", gap: 12 }}>
@@ -3267,6 +3287,8 @@ function App() {
   const [addOpen, setAddOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [editProjectTarget, setEditProjectTarget] = useState(null);
+  const [pendingBomProject, setPendingBomProject] = useState(null); // { projectId, name }
+  const [addPartInitialName, setAddPartInitialName] = useState("");
   const [toasts, setToasts] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [gistOpen, setGistOpen] = useState(false);
@@ -3435,7 +3457,17 @@ function App() {
       tol: "—",
       ...form,
     }, ...arr]);
-    addToast({ title: "Part created", desc: form.name });
+    setPendingBomProject(pending => {
+      if (pending) {
+        setProjects(arr => arr.map(p => p.id === pending.projectId
+          ? { ...p, bom: [...p.bom, { partId: id, need: 1 }], updated: "just now" }
+          : p));
+        addToast({ title: "Part created and added to BOM", desc: form.name });
+        return null;
+      }
+      addToast({ title: "Part created", desc: form.name });
+      return null;
+    });
   }, [addToast]);
 
   const createProject = useCallback((form) => {
@@ -3533,7 +3565,7 @@ function App() {
   }
   else if (typeof page === "object" && page.name === "project") {
     const proj = projects.find(p => p.id === page.id);
-    content = <ProjectDetail project={proj} parts={parts} navigate={setPage} addToast={addToast} deleteProject={deleteProject} onEdit={() => setEditProjectTarget(proj)} onAddBomLine={addBomLine} onRemoveBomLine={removeBomLine} />;
+    content = <ProjectDetail project={proj} parts={parts} navigate={setPage} addToast={addToast} deleteProject={deleteProject} onEdit={() => setEditProjectTarget(proj)} onAddBomLine={addBomLine} onRemoveBomLine={removeBomLine} onCreateNewPartForBom={(projectId, name) => { setPendingBomProject({ projectId }); setAddPartInitialName(name); setAddOpen(true); }} />;
   }
 
   return (
@@ -3576,7 +3608,7 @@ function App() {
         addProject={() => setNewProjectOpen(true)}
       />
 
-      <AddPartDrawer open={addOpen} onClose={() => setAddOpen(false)} onCreate={createPart} />
+      <AddPartDrawer open={addOpen} onClose={() => { setAddOpen(false); setAddPartInitialName(""); setPendingBomProject(null); }} onCreate={createPart} initialName={addPartInitialName} />
       <AddProjectDrawer open={newProjectOpen} onClose={() => setNewProjectOpen(false)} onCreate={createProject} />
       <AddProjectDrawer open={!!editProjectTarget} onClose={() => setEditProjectTarget(null)} initial={editProjectTarget} onUpdate={(form) => updateProject(editProjectTarget.id, form)} />
 
