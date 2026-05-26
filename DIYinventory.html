@@ -3389,10 +3389,21 @@ function GistSyncModal({ open, onClose, onSave, currentToken, currentGistId, syn
           <h3>GitHub Gist sync</h3>
           <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={onClose}>{icons.x}</button>
         </div>
-        <div className="drawer-body">
+        <form className="drawer-body" onSubmit={e => { e.preventDefault(); onSave(token.trim(), gistId.trim()); }}>
           <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.6 }}>
             Your parts are saved to a secret GitHub Gist and synced on every change. The token is stored only in this browser.
           </p>
+          <div className="field">
+            <label>Gist ID <span style={{ fontWeight: 400, textTransform: "none" }}>(leave blank to auto-create)</span></label>
+            <input
+              className="input mono"
+              name="gist-id"
+              autoComplete="username"
+              placeholder="abc123def456… or leave blank"
+              value={gistId}
+              onChange={e => setGistId(e.target.value)}
+            />
+          </div>
           <div className="field">
             <label>GitHub Personal Access Token</label>
             <input
@@ -3409,22 +3420,12 @@ function GistSyncModal({ open, onClose, onSave, currentToken, currentGistId, syn
               Create one at github.com/settings/tokens — only the <b>gist</b> scope is needed.
             </span>
           </div>
-          <div className="field">
-            <label>Gist ID <span style={{ fontWeight: 400, textTransform: "none" }}>(leave blank to auto-create)</span></label>
-            <input
-              className="input mono"
-              name="gist-id"
-              placeholder="abc123def456… or leave blank"
-              value={gistId}
-              onChange={e => setGistId(e.target.value)}
-            />
-          </div>
           {syncStatus && (
             <div style={{ fontSize: 12, color: syncStatus.ok ? "var(--accent)" : "var(--danger)", marginTop: 4 }}>
               {syncStatus.msg}
             </div>
           )}
-        </div>
+        </form>
         <div className="drawer-foot">
           {currentToken && (
             <button className="btn ghost" style={{ marginRight: "auto", color: "var(--danger)" }}
