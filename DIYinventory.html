@@ -3064,20 +3064,15 @@ function AddBomLineDrawer({ open, onClose, parts, existingIds, onAdd, onCreateNe
     if (open) { setQuery(""); setSelected(null); setNeed(1); setTimeout(() => inputRef.current && inputRef.current.focus(), 30); }
   }, [open]);
 
-  if (!open) return null;
+  const filtered = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return parts
+      .filter(p => !existingIds.has(p.id))
+      .filter(p => !q || p.name.toLowerCase().includes(q) || p.mpn.toLowerCase().includes(q) || p.mfg.toLowerCase().includes(q))
+      .slice(0, 40);
+  }, [query, parts, existingIds]);
 
-  const filtered = React.useMemo
-    ? React.useMemo(() => {
-        const q = query.trim().toLowerCase();
-        return parts
-          .filter(p => !existingIds.has(p.id))
-          .filter(p => !q || p.name.toLowerCase().includes(q) || p.mpn.toLowerCase().includes(q) || p.mfg.toLowerCase().includes(q))
-          .slice(0, 40);
-      }, [query, parts, existingIds])
-    : parts.filter(p => !existingIds.has(p.id)).filter(p => {
-        const q = query.trim().toLowerCase();
-        return !q || p.name.toLowerCase().includes(q) || p.mpn.toLowerCase().includes(q);
-      }).slice(0, 40);
+  if (!open) return null;
 
   const sel = selected ? parts.find(p => p.id === selected) : null;
 
