@@ -2228,7 +2228,10 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                         />
                       ) : (
                         <div onDoubleClick={() => setEditing({ id: p.id, field: "name" })} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span className="cat-dot" style={{ background: cat.color, flexShrink: 0 }}></span>
+                          {p.imageUrl
+                            ? <img src={p.imageUrl} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid var(--border)", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="inline-block"; }} />
+                            : null}
+                          <span className="cat-dot" style={{ background: cat.color, flexShrink: 0, display: p.imageUrl ? "none" : "" }}></span>
                           <a style={{ fontWeight: 500, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); navigate({ name: "part", id: p.id }); }}>{p.name}</a>
                           <span className="mono faint" style={{ fontSize: 11 }}>{p.value}</span>
                         </div>
