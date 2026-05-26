@@ -384,9 +384,9 @@ a { color: inherit; text-decoration: none; }
   font-variant-numeric: tabular-nums;
 }
 .qty .v { min-width: 28px; text-align: right; }
-.qty .step { width: 18px; height: 18px; display: none; place-items: center; color: var(--text-faint); border-radius: 3px; }
+.qty .step { width: 18px; height: 18px; display: grid; place-items: center; color: var(--text-faint); border-radius: 3px; opacity: 0; }
 .qty .step:hover { background: var(--bg-sunk); color: var(--text); }
-tr:hover .qty .step { display: grid; }
+tr:hover .qty .step { opacity: 1; }
 
 /* filter bar */
 .filter-bar {
