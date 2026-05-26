@@ -569,7 +569,10 @@ tr:hover .qty .step { opacity: 1; }
 .tree-node .chev { width: 14px; height: 14px; transition: transform 120ms; color: var(--text-faint); }
 .tree-node .chev.open { transform: rotate(90deg); }
 .tree-node .ic { width: 14px; height: 14px; color: var(--text-muted); flex-shrink: 0; }
-.tree-node .count { margin-left: auto; font-family: "Geist Mono", monospace; font-size: 11px; color: var(--text-faint); }
+.tree-node .count { font-family: "Geist Mono", monospace; font-size: 11px; color: var(--text-faint); }
+.tree-node .tree-actions { display: flex; gap: 1px; margin-left: auto; opacity: 0; transition: opacity 80ms; }
+.tree-node:hover .tree-actions, .tree-node.active .tree-actions { opacity: 1; }
+.tree-node .tree-actions .icon-btn { width: 18px; height: 18px; border-radius: 3px; }
 .tree-children { margin-left: 14px; border-left: 1px dashed var(--border); padding-left: 4px; }
 
 /* skeleton list of recent */
@@ -1513,12 +1516,35 @@ function genHistory(p) {
   return rows;
 }
 
+function addChildToTree(nodes, parentId, child) {
+  return nodes.map(n => {
+    if (n.id === parentId) return { ...n, children: [...(n.children || []), child] };
+    if (n.children) return { ...n, children: addChildToTree(n.children, parentId, child) };
+    return n;
+  });
+}
+function renameInTree(nodes, id, name) {
+  return nodes.map(n => {
+    if (n.id === id) return { ...n, name };
+    if (n.children) return { ...n, children: renameInTree(n.children, id, name) };
+    return n;
+  });
+}
+function removeFromTree(nodes, id) {
+  return nodes.filter(n => n.id !== id).map(n =>
+    n.children ? { ...n, children: removeFromTree(n.children, id) } : n
+  );
+}
+
 window.CATEGORIES = CATEGORIES;
 window.LOCATIONS = LOCATIONS;
 window.LOC_INDEX = LOC_INDEX;
 window.PARTS = PARTS;
 window.PROJECTS = PROJECTS;
 window.genHistory = genHistory;
+window.addChildToTree = addChildToTree;
+window.renameInTree = renameInTree;
+window.removeFromTree = removeFromTree;
 
   </script>
 
@@ -2563,25 +2589,69 @@ function PartDetail({ part, parts, navigate, updatePart, deletePart, addToast })
   );
 }
 
+// ---------- Location Modal ----------
+
+function LocationModal({ open, title, initial, onClose, onSave }) {
+  const [name, setName] = React.useState("");
+  const inputRef = React.useRef(null);
+  React.useEffect(() => {
+    if (open) { setName(initial || ""); setTimeout(() => inputRef.current && inputRef.current.focus(), 30); }
+  }, [open]);
+  if (!open) return null;
+  const submit = () => { if (name.trim()) { onSave(name.trim()); onClose(); } };
+  return (
+    <>
+      <div className="modal-backdrop" onClick={onClose}></div>
+      <div style={{ position: "fixed", top: "30%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 92, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", boxShadow: "var(--shadow-lg)", padding: 20, width: 320 }}>
+        <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 14 }}>{title}</div>
+        <input ref={inputRef} className="input" style={{ width: "100%" }} placeholder="Location name" value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") onClose(); }} />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={!name.trim()} onClick={submit}>Save</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ---------- Storage ----------
 
-function Storage({ parts, navigate }) {
-  const [selected, setSelected] = useState("bin-r-1k");
-  const [open, setOpen] = useState({ lab: true, "lab-a": true, "lab-a-1": true });
+function Storage({ parts, navigate, locations, locIndex, addLocation, renameLocation, deleteLocation }) {
+  const [selected, setSelected] = useState(() => {
+    const first = locations[0];
+    return first ? first.id : "";
+  });
+  const [open, setOpen] = useState(() => {
+    const o = {};
+    if (locations[0]) o[locations[0].id] = true;
+    return o;
+  });
+  const [modal, setModal] = useState(null); // { mode: "new"|"sub"|"rename", parentId?, nodeId?, name? }
 
   const countAt = (nodeId) => {
     const collectIds = (id) => {
       const ids = [id];
-      const node = findNode(LOCATIONS, id);
+      const node = findNode(locations, id);
       if (node && node.children) node.children.forEach(c => ids.push(...collectIds(c.id)));
       return ids;
     };
-    const ids = collectIds(nodeId);
-    return parts.filter(p => ids.includes(p.loc)).reduce((a, b) => a + b.qty, 0);
+    return parts.filter(p => collectIds(nodeId).includes(p.loc)).reduce((a, b) => a + b.qty, 0);
   };
 
   const inBin = useMemo(() => parts.filter(p => p.loc === selected), [parts, selected]);
-  const selNode = LOC_INDEX[selected];
+  const selNode = locIndex[selected];
+
+  const handleModalSave = (name) => {
+    if (modal.mode === "new") {
+      addLocation(null, name);
+    } else if (modal.mode === "sub") {
+      addLocation(modal.parentId, name);
+    } else if (modal.mode === "rename") {
+      renameLocation(modal.nodeId, name);
+    }
+  };
 
   return (
     <div className="content-inner">
@@ -2591,15 +2661,22 @@ function Storage({ parts, navigate }) {
           <div className="sub">Workshop → Shelf → Drawer → Bin · everything has a place</div>
         </div>
         <div className="actions">
-          <button className="btn"><span className="icon">{icons.plus}</span>New location</button>
+          <button className="btn" onClick={() => setModal({ mode: "new" })}>
+            <span className="icon">{icons.plus}</span>New location
+          </button>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "320px 1fr", gap: 16 }}>
         <div className="card" style={{ padding: 10 }}>
           <div className="tree">
-            {LOCATIONS.map(n => (
-              <TreeNode key={n.id} node={n} depth={0} open={open} setOpen={setOpen} selected={selected} setSelected={setSelected} countAt={countAt} />
+            {locations.map(n => (
+              <TreeNode key={n.id} node={n} depth={0} open={open} setOpen={setOpen}
+                selected={selected} setSelected={setSelected} countAt={countAt}
+                onRename={(id, name) => setModal({ mode: "rename", nodeId: id, name })}
+                onDelete={deleteLocation}
+                onAddChild={(id) => setModal({ mode: "sub", parentId: id })}
+              />
             ))}
           </div>
         </div>
@@ -2608,11 +2685,18 @@ function Storage({ parts, navigate }) {
           <div className="card-head">
             <div>
               <h3>{selNode ? selNode.name : "—"}</h3>
-              <LocPath id={selected} />
+              <LocPath id={selected} locIndex={locIndex} />
             </div>
             <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-              <button className="btn sm"><span className="icon">{icons.edit}</span>Rename</button>
-              <button className="btn sm"><span className="icon">{icons.plus}</span>Sub-location</button>
+              <button className="btn sm" onClick={() => selNode && setModal({ mode: "rename", nodeId: selected, name: selNode.name })}>
+                <span className="icon">{icons.edit}</span>Rename
+              </button>
+              <button className="btn sm" onClick={() => setModal({ mode: "sub", parentId: selected })}>
+                <span className="icon">{icons.plus}</span>Sub-location
+              </button>
+              <button className="btn sm" style={{ color: "var(--danger)" }} onClick={() => deleteLocation(selected)}>
+                <span className="icon">{icons.trash}</span>
+              </button>
             </div>
           </div>
 
@@ -2630,11 +2714,8 @@ function Storage({ parts, navigate }) {
             <table className="tbl">
               <thead>
                 <tr>
-                  <th></th>
-                  <th>Part</th>
-                  <th>Category</th>
-                  <th style={{ textAlign: "right" }}>Qty</th>
-                  <th>Status</th>
+                  <th></th><th>Part</th><th>Category</th>
+                  <th style={{ textAlign: "right" }}>Qty</th><th>Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -2659,6 +2740,14 @@ function Storage({ parts, navigate }) {
           </div>
         </div>
       </div>
+
+      <LocationModal
+        open={!!modal}
+        title={modal?.mode === "rename" ? "Rename location" : modal?.mode === "sub" ? "New sub-location" : "New location"}
+        initial={modal?.mode === "rename" ? modal.name : ""}
+        onClose={() => setModal(null)}
+        onSave={handleModalSave}
+      />
     </div>
   );
 }
@@ -2675,39 +2764,37 @@ function MiniStat({ label, value }) {
 function findNode(nodes, id) {
   for (const n of nodes) {
     if (n.id === id) return n;
-    if (n.children) {
-      const f = findNode(n.children, id);
-      if (f) return f;
-    }
+    if (n.children) { const f = findNode(n.children, id); if (f) return f; }
   }
   return null;
 }
 
-function TreeNode({ node, depth, open, setOpen, selected, setSelected, countAt }) {
+function TreeNode({ node, depth, open, setOpen, selected, setSelected, countAt, onRename, onDelete, onAddChild }) {
   const isOpen = !!open[node.id];
   const has = node.children && node.children.length;
-  const isLeaf = !has;
   const ic = depth === 0 ? "storage" : depth === 1 ? "folder" : depth === 2 ? "folder" : "cube";
   return (
     <>
       <div
         className={"tree-node" + (selected === node.id ? " active" : "")}
-        onClick={() => {
-          setSelected(node.id);
-          if (has) setOpen(o => ({ ...o, [node.id]: !o[node.id] }));
-        }}
+        onClick={() => { setSelected(node.id); if (has) setOpen(o => ({ ...o, [node.id]: !o[node.id] })); }}
       >
-        {has ? (
-          <span className={"chev" + (isOpen ? " open" : "")}>{icons.chev}</span>
-        ) : <span style={{ width: 14 }}></span>}
+        {has ? <span className={"chev" + (isOpen ? " open" : "")}>{icons.chev}</span> : <span style={{ width: 14 }}></span>}
         <span className="ic">{icons[ic]}</span>
-        <span style={{ fontWeight: depth === 0 ? 600 : 500 }}>{node.name}</span>
+        <span style={{ fontWeight: depth === 0 ? 600 : 500, flex: 1 }}>{node.name}</span>
+        <span className="tree-actions">
+          <button className="icon-btn" title="Rename" onClick={e => { e.stopPropagation(); onRename(node.id, node.name); }}>{icons.edit}</button>
+          <button className="icon-btn" title="Add sub-location" onClick={e => { e.stopPropagation(); onAddChild(node.id); }}>{icons.plus}</button>
+          <button className="icon-btn" title="Delete" style={{ color: "var(--danger)" }} onClick={e => { e.stopPropagation(); onDelete(node.id); }}>{icons.trash}</button>
+        </span>
         <span className="count">{countAt(node.id)}</span>
       </div>
       {has && isOpen && (
         <div className="tree-children">
           {node.children.map(c => (
-            <TreeNode key={c.id} node={c} depth={depth + 1} open={open} setOpen={setOpen} selected={selected} setSelected={setSelected} countAt={countAt} />
+            <TreeNode key={c.id} node={c} depth={depth + 1} open={open} setOpen={setOpen}
+              selected={selected} setSelected={setSelected} countAt={countAt}
+              onRename={onRename} onDelete={onDelete} onAddChild={onAddChild} />
           ))}
         </div>
       )}
@@ -3181,7 +3268,7 @@ Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPar
   </script>
 
   <script type="text/babel">
-/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks */
+/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
 
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -3278,6 +3365,12 @@ function App() {
       return saved ? JSON.parse(saved) : window.PROJECTS;
     } catch { return window.PROJECTS; }
   });
+  const [locations, setLocations] = useState(() => {
+    try {
+      const saved = localStorage.getItem("diy-locations");
+      return saved ? JSON.parse(saved) : window.LOCATIONS;
+    } catch { return window.LOCATIONS; }
+  });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -3306,6 +3399,13 @@ function App() {
   useEffect(() => {
     localStorage.setItem("diy-projects", JSON.stringify(projects));
   }, [projects]);
+
+  useEffect(() => {
+    localStorage.setItem("diy-locations", JSON.stringify(locations));
+  }, [locations]);
+
+  const locIndex = useMemo(() => buildLocIndex(locations), [locations]);
+  useEffect(() => { window.LOC_INDEX = locIndex; }, [locIndex]);
 
   // Gist sync: debounce writes, skip on first mount
   const isFirstRender = useRef(true);
@@ -3499,6 +3599,20 @@ function App() {
       : p));
   }, []);
 
+  const addLocation = useCallback((parentId, name) => {
+    const id = "loc-" + Math.random().toString(36).slice(2, 7);
+    const node = { id, name, children: [] };
+    setLocations(locs => parentId ? addChildToTree(locs, parentId, node) : [...locs, node]);
+  }, []);
+
+  const renameLocation = useCallback((id, name) => {
+    setLocations(locs => renameInTree(locs, id, name));
+  }, []);
+
+  const deleteLocation = useCallback((id) => {
+    setLocations(locs => removeFromTree(locs, id));
+  }, []);
+
   // Counts for sidebar
   const partCounts = useMemo(() => {
     const byCat = {};
@@ -3537,7 +3651,7 @@ function App() {
 
   let content;
   if (page === "dashboard") content = <Dashboard parts={parts} projects={projects} navigate={setPage} />;
-  else if (page === "storage") content = <Storage parts={parts} navigate={setPage} />;
+  else if (page === "storage") content = <Storage parts={parts} navigate={setPage} locations={locations} locIndex={locIndex} addLocation={addLocation} renameLocation={renameLocation} deleteLocation={deleteLocation} />;
   else if (page === "projects") content = <ProjectsPage projects={projects} parts={parts} navigate={setPage} addToast={addToast} onNew={() => setNewProjectOpen(true)} deleteProject={deleteProject} />;
   else if (typeof page === "object" && page.name === "parts") {
     content = <PartsList
