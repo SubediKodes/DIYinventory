@@ -1,16 +1,22 @@
 # DIYinventory
 
-A single-file web app for managing a personal electronics parts inventory. No installation, no server, no build step — open the HTML file in any browser and it works.
+A single-file web app for managing a personal electronics parts inventory. No installation, no server, no build step.
+
+**Live:** [subedikodes.github.io/DIYinventory/DIYinventory.html](https://subedikodes.github.io/DIYinventory/DIYinventory.html)
 
 ---
 
 ## How to run
 
+**Online** — open the link above in any browser.
+
+**Locally** — download `DIYinventory.html` and open it directly:
+
 ```
 open DIYinventory.html
 ```
 
-That's it. Works in Chrome, Firefox, Safari, or any modern browser.
+Works in Chrome, Firefox, Safari, or any modern browser.
 
 ---
 
