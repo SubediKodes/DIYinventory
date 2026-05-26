@@ -1263,6 +1263,9 @@ const icons = {
   history: <Ic d={<g><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" /></g>} />,
   bell: <Ic d={<g><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21a2 2 0 0 0 4 0" /></g>} />,
   command: <Ic d={<g><path d="M6 4a2 2 0 1 1-2 2V4zM18 4a2 2 0 1 0 2 2V4zM6 14a2 2 0 1 1-2 2v-2zM18 14a2 2 0 1 0 2 2v-2z" /><path d="M6 4h12v16H6z" fill="none" /></g>} />,
+  gear: <Ic d={<g><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></g>} />,
+  cloudUp: <Ic d={<g><path d="M12 16V8m-4 4 4-4 4 4" /><path d="M6.6 19A7 7 0 1 1 18 12.4" /><path d="M16 19h5M18.5 16.5 21 19l-2.5 2.5" /></g>} />,
+  cloudCheck: <Ic d={<g><path d="M6.6 19A7 7 0 1 1 18 12.4" /><path d="M13 18l2 2 4-4" /></g>} />,
 };
 
 window.Ic = Ic;
@@ -1502,7 +1505,7 @@ window.genHistory = genHistory;
 
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-function Sidebar({ page, setPage, partCounts, theme, setTheme, mobileOpen, setMobileOpen }) {
+function Sidebar({ page, setPage, partCounts, theme, setTheme, mobileOpen, setMobileOpen, onOpenGistSettings, ghToken, syncStatus }) {
   return (
     <aside className={"sidebar" + (mobileOpen ? " open" : "")}>
       <div className="sidebar-brand">
@@ -1553,12 +1556,26 @@ function Sidebar({ page, setPage, partCounts, theme, setTheme, mobileOpen, setMo
         <span style={{ flex: 1 }}>Recently added</span>
       </button>
 
-      <div className="sidebar-foot">
-        <div className="avatar">CK</div>
-        <div style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
-          <span style={{ fontWeight: 500 }}>Charlie K.</span>
-          <span className="faint" style={{ fontSize: 11 }}>Maker · home lab</span>
+      <div className="sidebar-foot" style={{ flexDirection: "column", gap: 6, alignItems: "stretch" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="avatar">CK</div>
+          <div style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            <span style={{ fontWeight: 500 }}>SR Subedi</span>
+            <span className="faint" style={{ fontSize: 11 }}>Maker · home lab</span>
+          </div>
+          <button className="icon-btn" onClick={onOpenGistSettings} title="GitHub Gist sync settings"
+            style={{ marginLeft: "auto", color: ghToken ? "var(--accent)" : undefined }}>{icons.gear}</button>
         </div>
+        {ghToken && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: syncStatus?.ok === false ? "var(--danger)" : syncStatus?.msg?.includes("Syncing") ? "var(--text-muted)" : "oklch(0.65 0.15 145)", paddingLeft: 2 }}>
+            <span style={{ flexShrink: 0, lineHeight: 1 }}>
+              {syncStatus?.ok === false ? icons.alert : syncStatus?.msg?.includes("Syncing") ? icons.cloudUp : icons.cloudCheck}
+            </span>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {syncStatus?.msg || "Gist sync ready"}
+            </span>
+          </div>
+        )}
       </div>
     </aside>
   );
@@ -1574,7 +1591,7 @@ function NavItem({ ic, label, count, active, onClick }) {
   );
 }
 
-function Topbar({ crumbs, onOpenPalette, onAddPart, setMobileOpen }) {
+function Topbar({ crumbs, onOpenPalette, onAddPart, setMobileOpen, exportParts, importParts }) {
   return (
     <header className="topbar">
       <button className="icon-btn mobile-only" onClick={() => setMobileOpen(x => !x)}>{icons.menu}</button>
@@ -1592,6 +1609,8 @@ function Topbar({ crumbs, onOpenPalette, onAddPart, setMobileOpen }) {
         <span>Search parts, projects…</span>
         <span className="kbd">⌘K</span>
       </button>
+      <button className="icon-btn" onClick={exportParts} title="Export parts as JSON">{icons.download}</button>
+      <button className="icon-btn" onClick={importParts} title="Import parts from JSON">{icons.upload}</button>
       <button className="icon-btn">{icons.bell}</button>
       <button className="btn primary" onClick={onAddPart}>
         <span className="icon">{icons.plus}</span>
@@ -2255,6 +2274,8 @@ const { useState, useEffect, useRef, useMemo } = React;
 function PartDetail({ part, parts, navigate, updatePart, deletePart, addToast }) {
   const [dragHover, setDragHover] = useState(false);
   const [images, setImages] = useState([]); // user-uploaded images
+  const [editingImageUrl, setEditingImageUrl] = useState(false);
+  const [imageUrlDraft, setImageUrlDraft] = useState(part.imageUrl || "");
   const [editingNotes, setEditingNotes] = useState(false);
   const [notesDraft, setNotesDraft] = useState(part.notes || "");
 
@@ -2312,29 +2333,43 @@ function PartDetail({ part, parts, navigate, updatePart, deletePart, addToast })
               onDrop={onDrop}
               style={{ aspectRatio: "4/3", padding: 0, overflow: "hidden", display: "grid", placeItems: "center" }}
             >
-              {images.length > 0 ? (
+              {part.imageUrl ? (
+                <img src={part.imageUrl} alt={part.name} style={{ width: "100%", height: "100%", objectFit: "contain", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="grid"; }} />
+              ) : images.length > 0 ? (
                 <img src={images[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
                 <div className="placeholder" style={{ width: "100%", height: "100%" }}>
                   <div>
                     <div className="big" style={{ color: "var(--text)" }}>Drop images here</div>
-                    <div style={{ marginTop: 4 }}>or click to browse · png · jpg · webp</div>
+                    <div style={{ marginTop: 4 }}>or paste a URL below · png · jpg · webp</div>
                   </div>
                 </div>
               )}
             </div>
-            <div className="thumbs">
-              {[0, 1, 2, 3].map(i => (
-                <div key={i} className="image-frame" style={{ aspectRatio: 1, cursor: "pointer" }}>
-                  {images[i] ? (
-                    <img src={images[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <div className="placeholder" style={{ width: "100%", height: "100%", fontSize: 10 }}>
-                      {i === 0 ? "front" : i === 1 ? "back" : i === 2 ? "pinout" : "schematic"}
-                    </div>
-                  )}
+            <div style={{ marginTop: 8 }}>
+              {editingImageUrl ? (
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    className="input"
+                    style={{ flex: 1, fontSize: 12 }}
+                    placeholder="https://…"
+                    value={imageUrlDraft}
+                    onChange={e => setImageUrlDraft(e.target.value)}
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === "Enter") { updatePart(part.id, { imageUrl: imageUrlDraft }); setEditingImageUrl(false); addToast({ title: "Image updated" }); }
+                      if (e.key === "Escape") { setImageUrlDraft(part.imageUrl || ""); setEditingImageUrl(false); }
+                    }}
+                  />
+                  <button className="btn sm primary" onClick={() => { updatePart(part.id, { imageUrl: imageUrlDraft }); setEditingImageUrl(false); addToast({ title: "Image updated" }); }}>Save</button>
+                  <button className="btn sm" onClick={() => { setImageUrlDraft(part.imageUrl || ""); setEditingImageUrl(false); }}>Cancel</button>
                 </div>
-              ))}
+              ) : (
+                <button className="btn sm ghost" style={{ width: "100%" }} onClick={() => { setImageUrlDraft(part.imageUrl || ""); setEditingImageUrl(true); }}>
+                  <span className="icon">{icons.edit}</span>
+                  {part.imageUrl ? "Change image URL" : "Add image URL"}
+                </button>
+              )}
             </div>
           </div>
 
@@ -2766,9 +2801,9 @@ function StatCardMini({ label, value, sub, good }) {
 
 function AddPartDrawer({ open, onClose, onCreate }) {
   const [form, setForm] = useState({
-    name: "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0,
+    name: "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "",
   });
-  useEffect(() => { if (open) setForm({ name: "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0 }); }, [open]);
+  useEffect(() => { if (open) setForm({ name: "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "" }); }, [open]);
   if (!open) return null;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const flatLocs = Object.values(LOC_INDEX);
@@ -2828,9 +2863,12 @@ function AddPartDrawer({ open, onClose, onCreate }) {
             <label>Notes</label>
             <textarea className="textarea" value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Pull-up workhorse · 5% carbon film…" />
           </div>
-          <div className="dropzone" style={{ marginTop: 8 }}>
-            <div className="big">Drop datasheet & images here</div>
-            <div>PDF, PNG, JPG · max 10 MB</div>
+          <div className="field">
+            <label>Image URL <span style={{ fontWeight: 400, textTransform: "none" }}>(optional)</span></label>
+            <input className="input" placeholder="https://…" value={form.imageUrl} onChange={e => set("imageUrl", e.target.value)} />
+            {form.imageUrl && (
+              <img src={form.imageUrl} alt="" style={{ marginTop: 8, width: "100%", maxHeight: 160, objectFit: "contain", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-sunk)" }} onError={e => e.target.style.display="none"} onLoad={e => e.target.style.display=""} />
+            )}
           </div>
         </div>
         <div className="drawer-foot">
@@ -2869,15 +2907,87 @@ const ACCENT_PRESETS = {
   "#475569": { hue: 250, chroma: 0.02 },   // neutral slate
 };
 
+function GistSyncModal({ open, onClose, onSave, currentToken, currentGistId, syncStatus }) {
+  const [token, setToken] = React.useState(currentToken || "");
+  const [gistId, setGistId] = React.useState(currentGistId || "");
+  React.useEffect(() => { if (open) { setToken(currentToken || ""); setGistId(currentGistId || ""); } }, [open]);
+  if (!open) return null;
+  return (
+    <>
+      <div className="modal-backdrop" onClick={onClose}></div>
+      <aside className="drawer">
+        <div className="drawer-head">
+          <span className="icon">{icons.gear}</span>
+          <h3>GitHub Gist sync</h3>
+          <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={onClose}>{icons.x}</button>
+        </div>
+        <div className="drawer-body">
+          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.6 }}>
+            Your parts are saved to a secret GitHub Gist and synced on every change. The token is stored only in this browser.
+          </p>
+          <div className="field">
+            <label>GitHub Personal Access Token</label>
+            <input
+              className="input mono"
+              type="password"
+              placeholder="ghp_…"
+              value={token}
+              onChange={e => setToken(e.target.value)}
+              autoFocus
+            />
+            <span style={{ fontSize: 11, color: "var(--text-faint)" }}>
+              Create one at github.com/settings/tokens — only the <b>gist</b> scope is needed.
+            </span>
+          </div>
+          <div className="field">
+            <label>Gist ID <span style={{ fontWeight: 400, textTransform: "none" }}>(leave blank to auto-create)</span></label>
+            <input
+              className="input mono"
+              placeholder="abc123def456… or leave blank"
+              value={gistId}
+              onChange={e => setGistId(e.target.value)}
+            />
+          </div>
+          {syncStatus && (
+            <div style={{ fontSize: 12, color: syncStatus.ok ? "var(--accent)" : "var(--danger)", marginTop: 4 }}>
+              {syncStatus.msg}
+            </div>
+          )}
+        </div>
+        <div className="drawer-foot">
+          {currentToken && (
+            <button className="btn ghost" style={{ marginRight: "auto", color: "var(--danger)" }}
+              onClick={() => onSave("", "")}>
+              Disconnect
+            </button>
+          )}
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={() => onSave(token.trim(), gistId.trim())}>Save</button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("diy-theme") || "light");
   const [page, setPage] = useState("dashboard");
-  const [parts, setParts] = useState(window.PARTS);
+  const [parts, setParts] = useState(() => {
+    try {
+      const saved = localStorage.getItem("diy-parts");
+      return saved ? JSON.parse(saved) : window.PARTS;
+    } catch { return window.PARTS; }
+  });
   const [projects] = useState(window.PROJECTS);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [gistOpen, setGistOpen] = useState(false);
+  const [ghToken, setGhToken] = useState(() => localStorage.getItem("diy-gh-token") || "");
+  const [gistId, setGistId] = useState(() => localStorage.getItem("diy-gist-id") || "");
+  const [syncStatus, setSyncStatus] = useState(null);
+  const syncTimer = useRef(null);
 
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
@@ -2885,6 +2995,65 @@ function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("diy-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("diy-parts", JSON.stringify(parts));
+  }, [parts]);
+
+  // Gist sync: debounce writes, skip on first mount
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (!ghToken) return;
+    clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(async () => {
+      setSyncStatus({ ok: true, msg: "Syncing…" });
+      try {
+        let id = gistId;
+        const body = { description: "DIYinventory parts", public: false, files: { "parts.json": { content: JSON.stringify(parts, null, 2) } } };
+        if (!id) {
+          const res = await fetch("https://api.github.com/gists", { method: "POST", headers: { Authorization: `Bearer ${ghToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+          if (!res.ok) throw new Error(`GitHub ${res.status}`);
+          const data = await res.json();
+          id = data.id;
+          setGistId(id);
+          localStorage.setItem("diy-gist-id", id);
+        } else {
+          const res = await fetch(`https://api.github.com/gists/${id}`, { method: "PATCH", headers: { Authorization: `Bearer ${ghToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+          if (!res.ok) throw new Error(`GitHub ${res.status}`);
+        }
+        setSyncStatus({ ok: true, msg: `Synced to Gist ${id.slice(0, 8)}… ✓` });
+      } catch (err) {
+        setSyncStatus({ ok: false, msg: `Sync failed: ${err.message}` });
+      }
+    }, 1500);
+  }, [parts, ghToken, gistId]);
+
+  // On load: pull latest from Gist if token + id are set
+  useEffect(() => {
+    if (!ghToken || !gistId) return;
+    (async () => {
+      try {
+        const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers: { Authorization: `Bearer ${ghToken}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        const content = data.files?.["parts.json"]?.content;
+        if (content) { setParts(JSON.parse(content)); setSyncStatus({ ok: true, msg: `Loaded from Gist ${gistId.slice(0, 8)}…` }); }
+      } catch {}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const saveGistSettings = useCallback((token, id) => {
+    setGhToken(token);
+    setGistId(id);
+    localStorage.setItem("diy-gh-token", token);
+    localStorage.setItem("diy-gist-id", id);
+    if (!token) { setSyncStatus(null); }
+    setGistOpen(false);
+    if (token) addToast({ title: id ? "Gist sync connected" : "Gist sync ready — will create Gist on next change" });
+    else addToast({ kind: "warn", title: "Gist sync disconnected" });
+  }, [addToast]);
 
   // Apply tweaks
   useEffect(() => {
@@ -2933,6 +3102,37 @@ function App() {
   const deletePart = useCallback((id) => {
     setParts(arr => arr.filter(p => p.id !== id));
   }, []);
+  const exportParts = useCallback(() => {
+    const blob = new Blob([JSON.stringify(parts, null, 2)], { type: "application/json" });
+    const a = Object.assign(document.createElement("a"), {
+      href: URL.createObjectURL(blob),
+      download: `diy-parts-${new Date().toISOString().slice(0, 10)}.json`,
+    });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, [parts]);
+
+  const importParts = useCallback(() => {
+    const input = Object.assign(document.createElement("input"), { type: "file", accept: ".json,application/json" });
+    input.onchange = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!Array.isArray(data)) throw new Error("Expected an array");
+          setParts(data);
+          addToast({ title: "Imported", desc: `${data.length} parts loaded` });
+        } catch (err) {
+          addToast({ kind: "warn", title: "Import failed", desc: err.message });
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, [addToast]);
+
   const createPart = useCallback((form) => {
     const id = "p" + Math.random().toString(36).slice(2, 6);
     setParts(arr => [{
@@ -3018,6 +3218,9 @@ function App() {
         setTheme={setTheme}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
+        onOpenGistSettings={() => setGistOpen(true)}
+        ghToken={ghToken}
+        syncStatus={syncStatus}
       />
       <main className="main">
         <Topbar
@@ -3025,6 +3228,8 @@ function App() {
           onOpenPalette={() => setPaletteOpen(true)}
           onAddPart={() => setAddOpen(true)}
           setMobileOpen={setMobileOpen}
+          exportParts={exportParts}
+          importParts={importParts}
         />
         <div className="content">{content}</div>
       </main>
@@ -3041,6 +3246,15 @@ function App() {
       />
 
       <AddPartDrawer open={addOpen} onClose={() => setAddOpen(false)} onCreate={createPart} />
+
+      <GistSyncModal
+        open={gistOpen}
+        onClose={() => setGistOpen(false)}
+        onSave={saveGistSettings}
+        currentToken={ghToken}
+        currentGistId={gistId}
+        syncStatus={syncStatus}
+      />
 
       <Toasts toasts={toasts} dismiss={dismissToast} />
 
