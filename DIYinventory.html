@@ -1836,7 +1836,7 @@ function Dashboard({ parts, projects, navigate }) {
     ...c,
     n: parts.filter(p => p.cat === c.id).length,
     q: parts.filter(p => p.cat === c.id).reduce((a, p) => a + p.qty, 0),
-  }));
+  })).filter(c => c.n > 0);
   const maxQ = Math.max(...cats.map(c => c.q));
 
   return (
