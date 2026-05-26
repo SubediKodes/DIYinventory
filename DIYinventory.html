@@ -3398,6 +3398,8 @@ function GistSyncModal({ open, onClose, onSave, currentToken, currentGistId, syn
             <input
               className="input mono"
               type="password"
+              name="github-token"
+              autoComplete="current-password"
               placeholder="ghp_…"
               value={token}
               onChange={e => setToken(e.target.value)}
@@ -3411,6 +3413,8 @@ function GistSyncModal({ open, onClose, onSave, currentToken, currentGistId, syn
             <label>Gist ID <span style={{ fontWeight: 400, textTransform: "none" }}>(leave blank to auto-create)</span></label>
             <input
               className="input mono"
+              name="gist-id"
+              autoComplete="off"
               placeholder="abc123def456… or leave blank"
               value={gistId}
               onChange={e => setGistId(e.target.value)}
