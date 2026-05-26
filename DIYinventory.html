@@ -325,6 +325,12 @@ a { color: inherit; text-decoration: none; }
 .tbl tbody tr { transition: background 60ms; }
 .tbl tbody tr:hover { background: var(--surface-2); }
 .tbl tbody tr.selected { background: var(--accent-soft); }
+.tbl tbody tr.checked { background: var(--accent-soft); }
+.cb { width: 15px; height: 15px; min-width: 15px; border: 1.5px solid var(--text-muted); border-radius: 4px; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; background: var(--surface); transition: border-color 80ms, background 80ms; margin: auto; }
+.tbl .col-cb { width: 44px; padding: 0 !important; text-align: center; }
+.cb.checked { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.cb.indeterminate { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.bulk-bar { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: var(--accent-soft); border-bottom: 1px solid var(--border); font-size: 13px; }
 .tbl tbody tr:last-child td { border-bottom: 0; }
 
 .cell-input {
@@ -1983,7 +1989,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, initialCa
   const [stockFilter, setStockFilter] = useState(initialFilter === "low" ? "low" : null);
   const [sortKey, setSortKey] = useState(initialFilter === "recent" ? "added" : "name");
   const [sortDir, setSortDir] = useState(initialFilter === "recent" ? "desc" : "asc");
-  const [selected, setSelected] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [editing, setEditing] = useState(null); // { id, field }
 
   useEffect(() => {
@@ -2017,6 +2023,17 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, initialCa
     });
     return r;
   }, [parts, query, catFilter, locFilter, stockFilter, sortKey, sortDir]);
+
+  const allChecked = filtered.length > 0 && filtered.every(p => selectedIds.has(p.id));
+  const someChecked = filtered.some(p => selectedIds.has(p.id));
+  const toggleOne = (id, e) => { e.stopPropagation(); setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; }); };
+  const toggleAll = () => setSelectedIds(allChecked ? new Set() : new Set(filtered.map(p => p.id)));
+  const clearSelection = () => setSelectedIds(new Set());
+  const deleteSelected = () => {
+    selectedIds.forEach(id => deletePart(id));
+    addToast({ kind: "warn", title: `${selectedIds.size} part${selectedIds.size > 1 ? "s" : ""} deleted` });
+    setSelectedIds(new Set());
+  };
 
   const toggleSort = key => {
     if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -2087,11 +2104,28 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, initialCa
           <div className="count">{filtered.length} rows</div>
         </div>
 
+        {someChecked && (
+          <div className="bulk-bar">
+            <span style={{ fontWeight: 500 }}>{selectedIds.size} selected</span>
+            <button className="btn sm ghost" onClick={clearSelection}>Deselect all</button>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+              <button className="btn sm" style={{ color: "var(--danger)" }} onClick={deleteSelected}>
+                <span className="icon">{icons.trash}</span> Delete selected
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="tbl-scroll">
           <table className="tbl">
             <thead>
               <tr>
-                <th style={{ width: 30 }}></th>
+                <th className="col-cb">
+                  <div className={"cb" + (allChecked ? " checked" : someChecked ? " indeterminate" : "")} onClick={toggleAll}>
+                    {allChecked && <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
+                    {!allChecked && someChecked && <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3"><line x1="5" y1="12" x2="19" y2="12" /></svg>}
+                  </div>
+                </th>
                 <th style={{ minWidth: 200 }}>
                   <span className="sort" onClick={() => toggleSort("name")}>Part name <span className="icon">{sortIcon("name")}</span></span>
                 </th>
@@ -2112,18 +2146,19 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, initialCa
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan="9" style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>
-                  No parts match your filters.
-                </td></tr>
+                <tr><td colSpan="9" style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>No parts match your filters.</td></tr>
               )}
               {filtered.map(p => {
                 const cat = window.CATEGORIES.find(c => c.id === p.cat);
                 const st = statusOf(p);
                 const isEdit = (k) => editing && editing.id === p.id && editing.field === k;
+                const isChecked = selectedIds.has(p.id);
                 return (
-                  <tr key={p.id} className={selected === p.id ? "selected" : ""} onClick={() => setSelected(p.id)}>
-                    <td>
-                      <span className="cat-dot" style={{ background: cat.color }}></span>
+                  <tr key={p.id} className={isChecked ? "checked" : ""} onClick={(e) => toggleOne(p.id, e)}>
+                    <td className="col-cb">
+                      <div className={"cb" + (isChecked ? " checked" : "")} onClick={(e) => toggleOne(p.id, e)}>
+                        {isChecked && <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
+                      </div>
                     </td>
                     <td>
                       {isEdit("name") ? (
@@ -2136,6 +2171,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, initialCa
                         />
                       ) : (
                         <div onDoubleClick={() => setEditing({ id: p.id, field: "name" })} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span className="cat-dot" style={{ background: cat.color, flexShrink: 0 }}></span>
                           <a style={{ fontWeight: 500, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); navigate({ name: "part", id: p.id }); }}>{p.name}</a>
                           <span className="mono faint" style={{ fontSize: 11 }}>{p.value}</span>
                         </div>
@@ -2801,7 +2837,7 @@ function StatCardMini({ label, value, sub, good }) {
 
 function AddPartDrawer({ open, onClose, onCreate }) {
   const [form, setForm] = useState({
-    name: "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "",
+    name: "", cat: "resistor", qty: 0, min: 1, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "",
   });
   useEffect(() => { if (open) setForm({ name: "", cat: "resistor", qty: 0, min: 5, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "" }); }, [open]);
   if (!open) return null;
