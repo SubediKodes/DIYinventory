@@ -1550,7 +1550,7 @@ function Sidebar({ page, setPage, partCounts, theme, setTheme, mobileOpen, setMo
       <NavItem ic="project" label="Projects" count={4} active={page === "projects"} onClick={() => { setPage("projects"); setMobileOpen(false); }} />
 
       <div className="sidebar-section">Categories</div>
-      {window.CATEGORIES.map(c => (
+      {window.CATEGORIES.filter(c => (partCounts.byCat[c.id] || 0) > 0).map(c => (
         <button
           key={c.id}
           className={"nav-item" + (page && page.name === "parts" && page.cat === c.id ? " active" : "")}
