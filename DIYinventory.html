@@ -2039,7 +2039,7 @@ function StatCard({ label, value, delta, up, down, icon, onClick }) {
 
 // ---------- Parts List ----------
 
-function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit, initialCat, initialFilter, addToast }) {
+function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit, openDelete, initialCat, initialFilter, addToast }) {
   const [query, setQuery] = useState("");
   const [catFilter, setCatFilter] = useState(initialCat || null);
   const [locFilter, setLocFilter] = useState(null);
@@ -2286,7 +2286,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                       ) : <span className="faint">—</span>}
                     </td>
                     <td>
-                      <RowMenu onView={() => navigate({ name: "part", id: p.id })} onEdit={() => openEdit(p)} onDelete={() => { deletePart(p.id); addToast({ kind: "warn", title: "Part deleted", desc: p.name }); }} />
+                      <RowMenu onView={() => navigate({ name: "part", id: p.id })} onEdit={() => openEdit(p)} onDelete={() => openDelete(p)} />
                     </td>
                   </tr>
                 );
@@ -2379,7 +2379,7 @@ const { useState, useEffect, useRef, useMemo } = React;
 
 // ---------- Part Detail ----------
 
-function PartDetail({ part, parts, navigate, updatePart, deletePart, addToast, onEdit }) {
+function PartDetail({ part, parts, navigate, updatePart, addToast, onEdit, onDelete }) {
   const [dragHover, setDragHover] = useState(false);
   const [images, setImages] = useState([]); // user-uploaded images
   const [editingImageUrl, setEditingImageUrl] = useState(false);
@@ -2430,7 +2430,7 @@ function PartDetail({ part, parts, navigate, updatePart, deletePart, addToast, o
             : <button className="btn" onClick={() => addToast({ kind: "warn", title: "No datasheet URL", desc: "Add one in the part detail below" })}><span className="icon">{icons.pdf}</span>Datasheet</button>
           }
           <button className="btn" onClick={onEdit}><span className="icon">{icons.edit}</span>Edit</button>
-          <button className="btn" style={{ color: "var(--danger)" }} onClick={() => { deletePart(part.id); navigate({ name: "parts" }); addToast({ kind: "warn", title: "Part deleted", desc: part.name }); }}>
+          <button className="btn" style={{ color: "var(--danger)" }} onClick={onDelete}>
             <span className="icon">{icons.trash}</span>
           </button>
         </div>
@@ -3315,12 +3315,47 @@ function AddBomLineDrawer({ open, onClose, parts, existingIds, onAdd, onCreateNe
   );
 }
 
-Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer });
+// ---------- Confirm Delete Part Modal ----------
+
+function ConfirmDeletePartModal({ part, projects, onConfirm, onClose }) {
+  if (!part) return null;
+  const usedIn = projects.filter(pr => pr.bom && pr.bom.some(b => b.partId === part.id));
+  return (
+    <>
+      <div className="modal-backdrop" onClick={onClose}></div>
+      <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 120, pointerEvents: "none" }}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "var(--shadow-lg)", padding: "24px 28px", width: 400, maxWidth: "90vw", pointerEvents: "all" }}>
+          <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 8 }}>Delete "{part.name}"?</div>
+          {usedIn.length > 0 ? (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 8 }}>
+                This part is used in {usedIn.length} project{usedIn.length > 1 ? "s" : ""}:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--text-muted)", display: "flex", flexDirection: "column", gap: 3 }}>
+                {usedIn.map(pr => (
+                  <li key={pr.id}>{pr.name} <span className="mono" style={{ fontSize: 11 }}>({pr.bom.find(b => b.partId === part.id).need} needed)</span></li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 16 }}>This action cannot be undone.</div>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button className="btn" onClick={onClose}>Cancel</button>
+            <button className="btn primary" style={{ background: "var(--danger)", borderColor: "var(--danger)", color: "#fff" }} onClick={onConfirm}>Delete</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal });
 
   </script>
 
   <script type="text/babel">
-/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
+/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
 
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -3428,6 +3463,7 @@ function App() {
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [editProjectTarget, setEditProjectTarget] = useState(null);
   const [editPartTarget, setEditPartTarget] = useState(null);
+  const [deletePartTarget, setDeletePartTarget] = useState(null);
   const [pendingBomProject, setPendingBomProject] = useState(null); // { projectId, name }
   const [addPartInitialName, setAddPartInitialName] = useState("");
   const [toasts, setToasts] = useState([]);
@@ -3722,6 +3758,7 @@ function App() {
       deletePart={deletePart}
       openAdd={() => setAddOpen(true)}
       openEdit={(p) => setEditPartTarget(p)}
+      openDelete={(p) => setDeletePartTarget(p)}
       initialCat={page.cat}
       initialFilter={page.filter}
       addToast={addToast}
@@ -3730,7 +3767,7 @@ function App() {
   else if (typeof page === "object" && page.name === "part") {
     const part = parts.find(p => p.id === page.id);
     if (!part) content = <div className="content-inner"><div className="muted">Part not found.</div></div>;
-    else content = <PartDetail part={part} parts={parts} navigate={setPage} updatePart={updatePart} deletePart={deletePart} addToast={addToast} onEdit={() => setEditPartTarget(part)} />;
+    else content = <PartDetail part={part} parts={parts} navigate={setPage} updatePart={updatePart} addToast={addToast} onEdit={() => setEditPartTarget(part)} onDelete={() => setDeletePartTarget(part)} />;
   }
   else if (typeof page === "object" && page.name === "project") {
     const proj = projects.find(p => p.id === page.id);
@@ -3779,6 +3816,17 @@ function App() {
 
       <AddPartDrawer open={addOpen} onClose={() => { setAddOpen(false); setAddPartInitialName(""); setPendingBomProject(null); }} onCreate={createPart} initialName={addPartInitialName} />
       <AddPartDrawer open={!!editPartTarget} onClose={() => setEditPartTarget(null)} initial={editPartTarget} onUpdate={(form) => { updatePart(editPartTarget.id, form); addToast({ title: "Part updated", desc: form.name }); }} />
+      <ConfirmDeletePartModal
+        part={deletePartTarget}
+        projects={projects}
+        onClose={() => setDeletePartTarget(null)}
+        onConfirm={() => {
+          deletePart(deletePartTarget.id);
+          if (typeof page === "object" && page.name === "part" && page.id === deletePartTarget.id) setPage({ name: "parts" });
+          addToast({ kind: "warn", title: "Part deleted", desc: deletePartTarget.name });
+          setDeletePartTarget(null);
+        }}
+      />
       <AddProjectDrawer open={newProjectOpen} onClose={() => setNewProjectOpen(false)} onCreate={createProject} />
       <AddProjectDrawer open={!!editProjectTarget} onClose={() => setEditProjectTarget(null)} initial={editProjectTarget} onUpdate={(form) => updateProject(editProjectTarget.id, form)} />
 
