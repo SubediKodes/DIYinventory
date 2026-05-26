@@ -2447,7 +2447,7 @@ function PartDetail({ part, parts, navigate, updatePart, deletePart, addToast, o
               style={{ padding: 0, overflow: "hidden", display: "grid", placeItems: "center", minHeight: 120 }}
             >
               {part.imageUrl ? (
-                <img src={part.imageUrl} alt={part.name} style={{ width: "100%", height: "auto", display: "block", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="grid"; }} />
+                <img src={part.imageUrl} alt={part.name} style={{ width: "50%", height: "auto", display: "block", margin: "0 auto", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="grid"; }} />
               ) : images.length > 0 ? (
                 <img src={images[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
