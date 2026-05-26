@@ -2044,7 +2044,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, initialCa
 
   const allChecked = filtered.length > 0 && filtered.every(p => selectedIds.has(p.id));
   const someChecked = filtered.some(p => selectedIds.has(p.id));
-  const toggleOne = (id, e) => { e.stopPropagation(); setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; }); };
+  const toggleOne = (id) => { setSelectedIds(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; }); };
   const toggleAll = () => setSelectedIds(allChecked ? new Set() : new Set(filtered.map(p => p.id)));
   const clearSelection = () => setSelectedIds(new Set());
   const deleteSelected = () => {
@@ -2172,9 +2172,9 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, initialCa
                 const isEdit = (k) => editing && editing.id === p.id && editing.field === k;
                 const isChecked = selectedIds.has(p.id);
                 return (
-                  <tr key={p.id} className={isChecked ? "checked" : ""} onClick={(e) => toggleOne(p.id, e)}>
+                  <tr key={p.id} className={isChecked ? "checked" : ""}>
                     <td className="col-cb">
-                      <div className={"cb" + (isChecked ? " checked" : "")} onClick={(e) => toggleOne(p.id, e)}>
+                      <div className={"cb" + (isChecked ? " checked" : "")} onClick={() => toggleOne(p.id)}>
                         {isChecked && <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
                       </div>
                     </td>
