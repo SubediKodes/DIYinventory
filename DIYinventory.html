@@ -2776,7 +2776,10 @@ function ProjectChip({ status }) {
   return <span className={"chip " + (m[status] || "")}>{status}</span>;
 }
 
-function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEdit }) {
+function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEdit, onAddBomLine, onRemoveBomLine }) {
+  const [bomOpen, setBomOpen] = React.useState(false);
+  const existingIds = new Set(project.bom.map(b => b.partId));
+
   const total = project.bom.reduce((a, b) => a + b.need, 0);
   const have = project.bom.reduce((a, b) => {
     const part = parts.find(p => p.id === b.partId);
@@ -2830,7 +2833,7 @@ function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEd
           <h3>Bill of Materials</h3>
           <span className="sub">{project.bom.length} line items</span>
           <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-            <button className="btn sm"><span className="icon">{icons.plus}</span>Add line</button>
+            <button className="btn sm primary" onClick={() => setBomOpen(true)}><span className="icon">{icons.plus}</span>Add part</button>
           </span>
         </div>
         <div className="tbl-scroll">
@@ -2845,9 +2848,15 @@ function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEd
                 <th>Location</th>
                 <th>Status</th>
                 <th style={{ textAlign: "right" }}>Line cost</th>
+                <th style={{ width: 36 }}></th>
               </tr>
             </thead>
             <tbody>
+              {project.bom.length === 0 && (
+                <tr><td colSpan="9" style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>
+                  No parts yet. Click <b>Add part</b> to build your BOM.
+                </td></tr>
+              )}
               {project.bom.map(b => {
                 const part = parts.find(p => p.id === b.partId);
                 if (!part) return null;
@@ -2870,6 +2879,13 @@ function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEd
                       {enough ? <span className="chip ok">Ready</span> : <span className="chip danger">Need {b.need - part.qty} more</span>}
                     </td>
                     <td className="cell-num">${(part.price * b.need).toFixed(2)}</td>
+                    <td>
+                      <button className="icon-btn" style={{ width: 24, height: 24, color: "var(--text-faint)" }}
+                        title="Remove from BOM"
+                        onClick={e => { e.stopPropagation(); onRemoveBomLine(project.id, b.partId); }}>
+                        {icons.x}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -2877,6 +2893,14 @@ function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEd
           </table>
         </div>
       </div>
+
+      <AddBomLineDrawer
+        open={bomOpen}
+        onClose={() => setBomOpen(false)}
+        parts={parts}
+        existingIds={existingIds}
+        onAdd={(partId, need) => { onAddBomLine(project.id, partId, need); addToast({ title: "Part added to BOM" }); }}
+      />
     </div>
   );
 }
@@ -3027,12 +3051,122 @@ function AddProjectDrawer({ open, onClose, onCreate, onUpdate, initial }) {
   );
 }
 
-Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer });
+// ---------- Add BOM Line Drawer ----------
+
+function AddBomLineDrawer({ open, onClose, parts, existingIds, onAdd }) {
+  const [query, setQuery] = React.useState("");
+  const [selected, setSelected] = React.useState(null);
+  const [need, setNeed] = React.useState(1);
+  const inputRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (open) { setQuery(""); setSelected(null); setNeed(1); setTimeout(() => inputRef.current && inputRef.current.focus(), 30); }
+  }, [open]);
+
+  if (!open) return null;
+
+  const filtered = React.useMemo
+    ? React.useMemo(() => {
+        const q = query.trim().toLowerCase();
+        return parts
+          .filter(p => !existingIds.has(p.id))
+          .filter(p => !q || p.name.toLowerCase().includes(q) || p.mpn.toLowerCase().includes(q) || p.mfg.toLowerCase().includes(q))
+          .slice(0, 40);
+      }, [query, parts, existingIds])
+    : parts.filter(p => !existingIds.has(p.id)).filter(p => {
+        const q = query.trim().toLowerCase();
+        return !q || p.name.toLowerCase().includes(q) || p.mpn.toLowerCase().includes(q);
+      }).slice(0, 40);
+
+  const sel = selected ? parts.find(p => p.id === selected) : null;
+
+  return (
+    <>
+      <div className="modal-backdrop" onClick={onClose}></div>
+      <aside className="drawer">
+        <div className="drawer-head">
+          <h3>Add part to BOM</h3>
+          <span className="muted" style={{ fontSize: 12 }}>Pick from inventory</span>
+          <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={onClose}>{icons.x}</button>
+        </div>
+        <div className="drawer-body" style={{ padding: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "12px 18px 8px", borderBottom: "1px solid var(--border)" }}>
+            <div className="filter-bar" style={{ padding: 0, border: 0, background: "transparent" }}>
+              <div className="search" style={{ flex: 1, maxWidth: "none" }}>
+                <span style={{ color: "var(--text-faint)" }}>{icons.search}</span>
+                <input ref={inputRef} placeholder="Search name, MPN, manufacturer…" value={query} onChange={e => setQuery(e.target.value)} />
+                {query && <button className="icon-btn" style={{ width: 18, height: 18 }} onClick={() => setQuery("")}>{icons.x}</button>}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            {filtered.length === 0 && (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--text-faint)", fontSize: 13 }}>
+                {query ? "No matching parts" : "All parts already in BOM"}
+              </div>
+            )}
+            {filtered.map(p => {
+              const cat = window.CATEGORIES.find(c => c.id === p.cat);
+              const isSel = selected === p.id;
+              return (
+                <div
+                  key={p.id}
+                  className={"list-row" + (isSel ? " selected" : "")}
+                  style={{ cursor: "pointer", background: isSel ? "var(--accent-soft)" : undefined }}
+                  onClick={() => setSelected(isSel ? null : p.id)}
+                >
+                  <span className="cat-dot" style={{ background: cat.color }}></span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 500, display: "flex", gap: 8, alignItems: "center" }}>
+                      {p.name}
+                      <span className="mono faint" style={{ fontSize: 11 }}>{p.mpn}</span>
+                    </div>
+                    <div className="meta">{p.mfg} · <span className="mono">{p.qty} in stock</span></div>
+                  </div>
+                  {isSel && <span style={{ color: "var(--accent)" }}>{icons.check}</span>}
+                </div>
+              );
+            })}
+          </div>
+
+          {sel && (
+            <div style={{ padding: "12px 18px", borderTop: "1px solid var(--border)", background: "var(--bg-sunk)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ flex: 1, fontSize: 13 }}>
+                <div style={{ fontWeight: 500 }}>{sel.name}</div>
+                <div className="muted" style={{ fontSize: 12 }}>{sel.qty} available</div>
+              </div>
+              <label style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 8 }}>
+                Qty needed
+                <input
+                  className="input mono"
+                  type="number"
+                  min="1"
+                  value={need}
+                  onChange={e => setNeed(Math.max(1, parseInt(e.target.value || "1", 10)))}
+                  style={{ width: 72 }}
+                />
+              </label>
+            </div>
+          )}
+        </div>
+        <div className="drawer-foot">
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={!sel} onClick={() => { onAdd(sel.id, need); onClose(); }}>
+            <span className="icon">{icons.plus}</span> Add to BOM
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer });
 
   </script>
 
   <script type="text/babel">
-/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks */
+/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks */
 
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -3328,6 +3462,18 @@ function App() {
     addToast({ title: "Project updated", desc: form.name });
   }, [addToast]);
 
+  const addBomLine = useCallback((projectId, partId, need) => {
+    setProjects(arr => arr.map(p => p.id === projectId
+      ? { ...p, bom: [...p.bom, { partId, need }], updated: "just now" }
+      : p));
+  }, []);
+
+  const removeBomLine = useCallback((projectId, partId) => {
+    setProjects(arr => arr.map(p => p.id === projectId
+      ? { ...p, bom: p.bom.filter(b => b.partId !== partId), updated: "just now" }
+      : p));
+  }, []);
+
   // Counts for sidebar
   const partCounts = useMemo(() => {
     const byCat = {};
@@ -3387,7 +3533,7 @@ function App() {
   }
   else if (typeof page === "object" && page.name === "project") {
     const proj = projects.find(p => p.id === page.id);
-    content = <ProjectDetail project={proj} parts={parts} navigate={setPage} addToast={addToast} deleteProject={deleteProject} onEdit={() => setEditProjectTarget(proj)} />;
+    content = <ProjectDetail project={proj} parts={parts} navigate={setPage} addToast={addToast} deleteProject={deleteProject} onEdit={() => setEditProjectTarget(proj)} onAddBomLine={addBomLine} onRemoveBomLine={removeBomLine} />;
   }
 
   return (
