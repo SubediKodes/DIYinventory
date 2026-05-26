@@ -2776,7 +2776,7 @@ function ProjectChip({ status }) {
   return <span className={"chip " + (m[status] || "")}>{status}</span>;
 }
 
-function ProjectDetail({ project, parts, navigate, addToast, deleteProject }) {
+function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEdit }) {
   const total = project.bom.reduce((a, b) => a + b.need, 0);
   const have = project.bom.reduce((a, b) => {
     const part = parts.find(p => p.id === b.partId);
@@ -2805,6 +2805,7 @@ function ProjectDetail({ project, parts, navigate, addToast, deleteProject }) {
         </div>
         <div className="actions">
           <button className="btn"><span className="icon">{icons.download}</span>Export BOM</button>
+          <button className="btn" onClick={onEdit}><span className="icon">{icons.edit}</span>Edit</button>
           <button className="btn" style={{ color: "var(--danger)" }} onClick={() => deleteProject(project.id, project.name)}>
             <span className="icon">{icons.trash}</span>
           </button>
@@ -2981,9 +2982,12 @@ function AddPartDrawer({ open, onClose, onCreate }) {
 
 // ---------- Add Project Drawer ----------
 
-function AddProjectDrawer({ open, onClose, onCreate }) {
+function AddProjectDrawer({ open, onClose, onCreate, onUpdate, initial }) {
+  const editing = !!initial;
   const [form, setForm] = React.useState({ name: "", desc: "", status: "Designing" });
-  React.useEffect(() => { if (open) setForm({ name: "", desc: "", status: "Designing" }); }, [open]);
+  React.useEffect(() => {
+    if (open) setForm(initial ? { name: initial.name, desc: initial.desc || "", status: initial.status } : { name: "", desc: "", status: "Designing" });
+  }, [open]);
   if (!open) return null;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const statuses = ["Designing", "In progress", "Backlog", "Done"];
@@ -2992,8 +2996,8 @@ function AddProjectDrawer({ open, onClose, onCreate }) {
       <div className="modal-backdrop" onClick={onClose}></div>
       <aside className="drawer">
         <div className="drawer-head">
-          <h3>New project</h3>
-          <span className="muted" style={{ fontSize: 12 }}>Add BOM parts after creating</span>
+          <h3>{editing ? "Edit project" : "New project"}</h3>
+          <span className="muted" style={{ fontSize: 12 }}>{editing ? initial.name : "Add BOM parts after creating"}</span>
           <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={onClose}>{icons.x}</button>
         </div>
         <div className="drawer-body">
@@ -3014,8 +3018,8 @@ function AddProjectDrawer({ open, onClose, onCreate }) {
         </div>
         <div className="drawer-foot">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={!form.name.trim()} onClick={() => { onCreate(form); onClose(); }}>
-            <span className="icon">{icons.plus}</span> Create project
+          <button className="btn primary" disabled={!form.name.trim()} onClick={() => { editing ? onUpdate(form) : onCreate(form); onClose(); }}>
+            <span className="icon">{editing ? icons.check : icons.plus}</span> {editing ? "Save changes" : "Create project"}
           </button>
         </div>
       </aside>
@@ -3128,6 +3132,7 @@ function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [editProjectTarget, setEditProjectTarget] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [gistOpen, setGistOpen] = useState(false);
@@ -3318,6 +3323,11 @@ function App() {
     addToast({ kind: "warn", title: "Project deleted", desc: name });
   }, [addToast]);
 
+  const updateProject = useCallback((id, form) => {
+    setProjects(arr => arr.map(p => p.id === id ? { ...p, name: form.name.trim(), desc: form.desc.trim(), status: form.status, updated: "just now" } : p));
+    addToast({ title: "Project updated", desc: form.name });
+  }, [addToast]);
+
   // Counts for sidebar
   const partCounts = useMemo(() => {
     const byCat = {};
@@ -3377,7 +3387,7 @@ function App() {
   }
   else if (typeof page === "object" && page.name === "project") {
     const proj = projects.find(p => p.id === page.id);
-    content = <ProjectDetail project={proj} parts={parts} navigate={setPage} addToast={addToast} deleteProject={deleteProject} />;
+    content = <ProjectDetail project={proj} parts={parts} navigate={setPage} addToast={addToast} deleteProject={deleteProject} onEdit={() => setEditProjectTarget(proj)} />;
   }
 
   return (
@@ -3422,6 +3432,7 @@ function App() {
 
       <AddPartDrawer open={addOpen} onClose={() => setAddOpen(false)} onCreate={createPart} />
       <AddProjectDrawer open={newProjectOpen} onClose={() => setNewProjectOpen(false)} onCreate={createProject} />
+      <AddProjectDrawer open={!!editProjectTarget} onClose={() => setEditProjectTarget(null)} initial={editProjectTarget} onUpdate={(form) => updateProject(editProjectTarget.id, form)} />
 
       <GistSyncModal
         open={gistOpen}
