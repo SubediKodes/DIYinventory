@@ -1528,7 +1528,7 @@ window.genHistory = genHistory;
 
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-function Sidebar({ page, setPage, partCounts, theme, setTheme, mobileOpen, setMobileOpen, onOpenGistSettings, ghToken, syncStatus }) {
+function Sidebar({ page, setPage, partCounts, projects, theme, setTheme, mobileOpen, setMobileOpen, onOpenGistSettings, ghToken, syncStatus }) {
   return (
     <aside className={"sidebar" + (mobileOpen ? " open" : "")}>
       <div className="sidebar-brand">
@@ -1547,7 +1547,7 @@ function Sidebar({ page, setPage, partCounts, theme, setTheme, mobileOpen, setMo
       <NavItem ic="dashboard" label="Dashboard" active={page === "dashboard"} onClick={() => { setPage("dashboard"); setMobileOpen(false); }} />
       <NavItem ic="parts" label="Parts" count={partCounts.total} active={page === "parts"} onClick={() => { setPage({ name: "parts" }); setMobileOpen(false); }} />
       <NavItem ic="storage" label="Storage" active={page === "storage"} onClick={() => { setPage("storage"); setMobileOpen(false); }} />
-      <NavItem ic="project" label="Projects" count={4} active={page === "projects"} onClick={() => { setPage("projects"); setMobileOpen(false); }} />
+      <NavItem ic="project" label="Projects" count={projects.length} active={page === "projects"} onClick={() => { setPage("projects"); setMobileOpen(false); }} />
 
       <div className="sidebar-section">Categories</div>
       {window.CATEGORIES.filter(c => (partCounts.byCat[c.id] || 0) > 0).map(c => (
@@ -1643,7 +1643,7 @@ function Topbar({ crumbs, onOpenPalette, onAddPart, setMobileOpen, exportParts, 
   );
 }
 
-function CommandPalette({ open, onClose, parts, projects, navigate, theme, setTheme, addPart }) {
+function CommandPalette({ open, onClose, parts, projects, navigate, theme, setTheme, addPart, addProject }) {
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
   const inputRef = useRef(null);
@@ -1660,6 +1660,7 @@ function CommandPalette({ open, onClose, parts, projects, navigate, theme, setTh
     const Q = q.trim().toLowerCase();
     const actions = [
       { id: "act:add", t: "Add new part", section: "Actions", icon: "plus", run: () => { onClose(); addPart(); } },
+      { id: "act:newproj", t: "New project", section: "Actions", icon: "project", run: () => { onClose(); addProject(); } },
       { id: "act:dashboard", t: "Go to Dashboard", section: "Actions", icon: "dashboard", run: () => { onClose(); navigate("dashboard"); } },
       { id: "act:parts", t: "Go to Parts", section: "Actions", icon: "parts", run: () => { onClose(); navigate({ name: "parts" }); } },
       { id: "act:storage", t: "Go to Storage", section: "Actions", icon: "storage", run: () => { onClose(); navigate("storage"); } },
@@ -2716,7 +2717,7 @@ function TreeNode({ node, depth, open, setOpen, selected, setSelected, countAt }
 
 // ---------- Projects ----------
 
-function ProjectsPage({ projects, parts, navigate, addToast }) {
+function ProjectsPage({ projects, parts, navigate, addToast, onNew }) {
   return (
     <div className="content-inner">
       <div className="page-head">
@@ -2725,7 +2726,7 @@ function ProjectsPage({ projects, parts, navigate, addToast }) {
           <div className="sub">Track BOMs and what you can build right now.</div>
         </div>
         <div className="actions">
-          <button className="btn primary" onClick={() => addToast({ title: "New project", desc: "(stub) Project creation coming soon" })}><span className="icon">{icons.plus}</span>New project</button>
+          <button className="btn primary" onClick={onNew}><span className="icon">{icons.plus}</span>New project</button>
         </div>
       </div>
 
@@ -2969,12 +2970,56 @@ function AddPartDrawer({ open, onClose, onCreate }) {
   );
 }
 
-Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer });
+// ---------- Add Project Drawer ----------
+
+function AddProjectDrawer({ open, onClose, onCreate }) {
+  const [form, setForm] = React.useState({ name: "", desc: "", status: "Designing" });
+  React.useEffect(() => { if (open) setForm({ name: "", desc: "", status: "Designing" }); }, [open]);
+  if (!open) return null;
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const statuses = ["Designing", "In progress", "Backlog", "Done"];
+  return (
+    <>
+      <div className="modal-backdrop" onClick={onClose}></div>
+      <aside className="drawer">
+        <div className="drawer-head">
+          <h3>New project</h3>
+          <span className="muted" style={{ fontSize: 12 }}>Add BOM parts after creating</span>
+          <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={onClose}>{icons.x}</button>
+        </div>
+        <div className="drawer-body">
+          <div className="field">
+            <label>Project name</label>
+            <input className="input" placeholder="e.g. Greenhouse Monitor v2" value={form.name} onChange={e => set("name", e.target.value)} autoFocus />
+          </div>
+          <div className="field">
+            <label>Description</label>
+            <textarea className="textarea" value={form.desc} onChange={e => set("desc", e.target.value)} placeholder="What are you building?" />
+          </div>
+          <div className="field">
+            <label>Status</label>
+            <select className="select" value={form.status} onChange={e => set("status", e.target.value)}>
+              {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="drawer-foot">
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={!form.name.trim()} onClick={() => { onCreate(form); onClose(); }}>
+            <span className="icon">{icons.plus}</span> Create project
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer });
 
   </script>
 
   <script type="text/babel">
-/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks */
+/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks */
 
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -3065,9 +3110,15 @@ function App() {
       return saved ? JSON.parse(saved) : window.PARTS;
     } catch { return window.PARTS; }
   });
-  const [projects] = useState(window.PROJECTS);
+  const [projects, setProjects] = useState(() => {
+    try {
+      const saved = localStorage.getItem("diy-projects");
+      return saved ? JSON.parse(saved) : window.PROJECTS;
+    } catch { return window.PROJECTS; }
+  });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [toasts, setToasts] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [gistOpen, setGistOpen] = useState(false);
@@ -3086,6 +3137,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem("diy-parts", JSON.stringify(parts));
   }, [parts]);
+
+  useEffect(() => {
+    localStorage.setItem("diy-projects", JSON.stringify(projects));
+  }, [projects]);
 
   // Gist sync: debounce writes, skip on first mount
   const isFirstRender = useRef(true);
@@ -3232,6 +3287,19 @@ function App() {
     addToast({ title: "Part created", desc: form.name });
   }, [addToast]);
 
+  const createProject = useCallback((form) => {
+    const id = "proj-" + Math.random().toString(36).slice(2, 7);
+    setProjects(arr => [{
+      id,
+      name: form.name.trim(),
+      desc: form.desc.trim(),
+      status: form.status,
+      updated: "just now",
+      bom: [],
+    }, ...arr]);
+    addToast({ title: "Project created", desc: form.name });
+  }, [addToast]);
+
   // Counts for sidebar
   const partCounts = useMemo(() => {
     const byCat = {};
@@ -3271,7 +3339,7 @@ function App() {
   let content;
   if (page === "dashboard") content = <Dashboard parts={parts} projects={projects} navigate={setPage} />;
   else if (page === "storage") content = <Storage parts={parts} navigate={setPage} />;
-  else if (page === "projects") content = <ProjectsPage projects={projects} parts={parts} navigate={setPage} addToast={addToast} />;
+  else if (page === "projects") content = <ProjectsPage projects={projects} parts={parts} navigate={setPage} addToast={addToast} onNew={() => setNewProjectOpen(true)} />;
   else if (typeof page === "object" && page.name === "parts") {
     content = <PartsList
       parts={parts}
@@ -3301,6 +3369,7 @@ function App() {
         page={typeof page === "object" ? page : page}
         setPage={setPage}
         partCounts={partCounts}
+        projects={projects}
         theme={theme}
         setTheme={setTheme}
         mobileOpen={mobileOpen}
@@ -3330,9 +3399,11 @@ function App() {
         theme={theme}
         setTheme={setTheme}
         addPart={() => setAddOpen(true)}
+        addProject={() => setNewProjectOpen(true)}
       />
 
       <AddPartDrawer open={addOpen} onClose={() => setAddOpen(false)} onCreate={createPart} />
+      <AddProjectDrawer open={newProjectOpen} onClose={() => setNewProjectOpen(false)} onCreate={createProject} />
 
       <GistSyncModal
         open={gistOpen}
