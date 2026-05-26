@@ -1815,10 +1815,19 @@ const { useState, useEffect, useRef, useMemo } = React;
 
 // ---------- helpers ----------
 
+function effectiveMin(p) {
+  const need = (window.PROJECTS || []).reduce((a, proj) => {
+    const b = proj.bom ? proj.bom.find(x => x.partId === p.id) : null;
+    return a + (b ? b.need : 0);
+  }, 0);
+  return Math.max(p.min, need);
+}
+
 function statusOf(p) {
-  if (p.qty === 0) return { kind: "danger", label: "Out" };
-  if (p.qty < p.min) return { kind: "danger", label: "Short" };
-  if (p.qty < p.min * 1.5) return { kind: "warn", label: "Low" };
+  const min = effectiveMin(p);
+  if (p.qty === 0 && min > 0) return { kind: "danger", label: "Out" };
+  if (p.qty < min) return { kind: "danger", label: "Short" };
+  if (min > 0 && p.qty < min * 1.5) return { kind: "warn", label: "Low" };
   return { kind: "ok", label: "OK" };
 }
 
@@ -1853,10 +1862,13 @@ function LocPath({ id }) {
 function Dashboard({ parts, projects, navigate }) {
   const total = parts.reduce((a, p) => a + p.qty, 0);
   const unique = parts.length;
-  const low = parts.filter(p => p.qty < p.min).length;
+  const low = parts.filter(p => p.qty < effectiveMin(p)).length;
   const value = parts.reduce((a, p) => a + (p.qty * (p.price || 0)), 0);
   const recent = [...parts].sort((a, b) => b.added.localeCompare(a.added)).slice(0, 6);
-  const lowList = parts.filter(p => p.qty < p.min).sort((a, b) => (a.qty / a.min) - (b.qty / b.min)).slice(0, 6);
+  const lowList = parts.filter(p => p.qty < effectiveMin(p)).sort((a, b) => {
+    const am = effectiveMin(a), bm = effectiveMin(b);
+    return (a.qty / (am || 1)) - (b.qty / (bm || 1));
+  }).slice(0, 6);
 
   // category breakdown bars
   const cats = window.CATEGORIES.map(c => ({
@@ -1903,7 +1915,8 @@ function Dashboard({ parts, projects, navigate }) {
               </div>
             )}
             {lowList.map(p => {
-              const pct = Math.min(100, (p.qty / p.min) * 100);
+              const emin = effectiveMin(p);
+              const pct = Math.min(100, emin > 0 ? (p.qty / emin) * 100 : 100);
               const cat = window.CATEGORIES.find(c => c.id === p.cat);
               return (
                 <div key={p.id} className="list-row" onClick={() => navigate({ name: "part", id: p.id })} style={{ cursor: "pointer" }}>
@@ -1911,7 +1924,7 @@ function Dashboard({ parts, projects, navigate }) {
                   <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
                     <div className="name" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                      <span className="chip danger">{p.qty}/{p.min}</span>
+                      <span className="chip danger">{p.qty}/{emin}</span>
                     </div>
                     <div className="bom-bar" style={{ marginTop: 5 }}><div className="short" style={{ width: pct + "%" }}></div></div>
                   </div>
@@ -2047,7 +2060,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
     let r = parts;
     if (catFilter) r = r.filter(p => p.cat === catFilter);
     if (locFilter) r = r.filter(p => p.loc === locFilter);
-    if (stockFilter === "low") r = r.filter(p => p.qty < p.min);
+    if (stockFilter === "low") r = r.filter(p => p.qty < effectiveMin(p));
     if (query.trim()) {
       const q = query.toLowerCase();
       r = r.filter(p =>
@@ -2351,12 +2364,12 @@ function RowMenu({ onView, onEdit, onDelete }) {
   );
 }
 
-Object.assign(window, { Dashboard, PartsList, StatCard, CatChip, LocPath, statusOf });
+Object.assign(window, { Dashboard, PartsList, StatCard, CatChip, LocPath, statusOf, effectiveMin });
 
   </script>
 
   <script type="text/babel">
-/* global React, icons, Ic, CATEGORIES, LOCATIONS, LOC_INDEX, PARTS, PROJECTS, genHistory, statusOf, CatChip, LocPath */
+/* global React, icons, Ic, CATEGORIES, LOCATIONS, LOC_INDEX, PARTS, PROJECTS, genHistory, statusOf, effectiveMin, CatChip, LocPath */
 // Detail pages: PartDetail, Storage, Projects list, Project detail, AddPartDrawer
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -2715,7 +2728,7 @@ function Storage({ parts, navigate, locations, locIndex, addLocation, renameLoca
           <div style={{ padding: "12px 14px", display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
             <MiniStat label="Direct parts" value={inBin.length} />
             <MiniStat label="Total quantity" value={inBin.reduce((a, p) => a + p.qty, 0).toLocaleString()} />
-            <MiniStat label="Low stock here" value={inBin.filter(p => p.qty < p.min).length} />
+            <MiniStat label="Low stock here" value={inBin.filter(p => p.qty < effectiveMin(p)).length} />
           </div>
 
           <div className="card-head" style={{ borderTop: "1px solid var(--border)" }}>
@@ -3435,6 +3448,7 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("diy-projects", JSON.stringify(projects));
+    window.PROJECTS = projects;
   }, [projects]);
 
   useEffect(() => {
@@ -3654,12 +3668,19 @@ function App() {
   const partCounts = useMemo(() => {
     const byCat = {};
     parts.forEach(p => { byCat[p.cat] = (byCat[p.cat] || 0) + 1; });
+    const emin = (p) => {
+      const need = projects.reduce((a, proj) => {
+        const b = proj.bom ? proj.bom.find(x => x.partId === p.id) : null;
+        return a + (b ? b.need : 0);
+      }, 0);
+      return Math.max(p.min, need);
+    };
     return {
       total: parts.length,
-      low: parts.filter(p => p.qty < p.min).length,
+      low: parts.filter(p => p.qty < emin(p)).length,
       byCat,
     };
-  }, [parts]);
+  }, [parts, projects]);
 
   // Crumbs
   const crumbs = useMemo(() => {
