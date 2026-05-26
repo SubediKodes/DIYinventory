@@ -3152,7 +3152,7 @@ function App() {
       setSyncStatus({ ok: true, msg: "Syncing…" });
       try {
         let id = gistId;
-        const body = { description: "DIYinventory parts", public: false, files: { "parts.json": { content: JSON.stringify(parts, null, 2) } } };
+        const body = { description: "DIYinventory parts", public: false, files: { "parts.json": { content: JSON.stringify(parts, null, 2) }, "projects.json": { content: JSON.stringify(projects, null, 2) } } };
         if (!id) {
           const res = await fetch("https://api.github.com/gists", { method: "POST", headers: { Authorization: `Bearer ${ghToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
           if (!res.ok) throw new Error(`GitHub ${res.status}`);
@@ -3169,7 +3169,7 @@ function App() {
         setSyncStatus({ ok: false, msg: `Sync failed: ${err.message}` });
       }
     }, 1500);
-  }, [parts, ghToken, gistId]);
+  }, [parts, projects, ghToken, gistId]);
 
   // On load: pull latest from Gist if token + id are set
   useEffect(() => {
@@ -3180,7 +3180,10 @@ function App() {
         if (!res.ok) return;
         const data = await res.json();
         const content = data.files?.["parts.json"]?.content;
-        if (content) { setParts(JSON.parse(content)); setSyncStatus({ ok: true, msg: `Loaded from Gist ${gistId.slice(0, 8)}…` }); }
+        if (content) setParts(JSON.parse(content));
+        const projContent = data.files?.["projects.json"]?.content;
+        if (projContent) setProjects(JSON.parse(projContent));
+        if (content || projContent) setSyncStatus({ ok: true, msg: `Loaded from Gist ${gistId.slice(0, 8)}…` });
       } catch {}
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
