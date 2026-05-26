@@ -3439,7 +3439,12 @@ function GistSyncModal({ open, onClose, onSave, currentToken, currentGistId, syn
 
 function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("diy-theme") || "light");
-  const [page, setPage] = useState("dashboard");
+  const [page, setPage] = useState(() => {
+    try {
+      const saved = localStorage.getItem("diy-page");
+      return saved ? JSON.parse(saved) : "dashboard";
+    } catch { return "dashboard"; }
+  });
   const [parts, setParts] = useState(() => {
     try {
       const saved = localStorage.getItem("diy-parts");
@@ -3480,6 +3485,10 @@ function App() {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem("diy-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("diy-page", JSON.stringify(page));
+  }, [page]);
 
   useEffect(() => {
     localStorage.setItem("diy-parts", JSON.stringify(parts));
