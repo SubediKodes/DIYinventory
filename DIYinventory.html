@@ -1652,7 +1652,7 @@ function NavItem({ ic, label, count, active, onClick }) {
   );
 }
 
-function Topbar({ crumbs, onOpenPalette, onAddPart, onAIScan, setMobileOpen, exportParts, importParts }) {
+function Topbar({ crumbs, onOpenPalette, onAddPart, setMobileOpen, exportParts, importParts }) {
   return (
     <header className="topbar">
       <button className="icon-btn mobile-only" onClick={() => setMobileOpen(x => !x)}>{icons.menu}</button>
@@ -1672,7 +1672,6 @@ function Topbar({ crumbs, onOpenPalette, onAddPart, onAIScan, setMobileOpen, exp
       </button>
       <button className="icon-btn" onClick={exportParts} title="Export parts as JSON">{icons.download}</button>
       <button className="icon-btn" onClick={importParts} title="Import parts from JSON">{icons.upload}</button>
-      <button className="icon-btn" onClick={onAIScan} title="Scan component with AI" style={{ color: "var(--accent)" }}>{icons.sparkle}</button>
       <button className="btn primary" onClick={onAddPart}>
         <span className="icon">{icons.plus}</span>
         Add part
@@ -3050,21 +3049,63 @@ function StatCardMini({ label, value, sub, good }) {
 
 // ---------- Add Part Drawer ----------
 
-function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial, prefill }) {
+function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial, deepseekKey, onSaveDeepseekKey }) {
   const editing = !!initial;
   const [form, setForm] = useState({
     name: "", cat: "resistor", qty: 0, min: 1, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "",
   });
+  const [identifying, setIdentifying] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [keyDraft, setKeyDraft] = useState("");
+  const [editingKey, setEditingKey] = useState(false);
+
   useEffect(() => {
     if (!open) return;
+    setAiError(null); setEditingKey(false); setKeyDraft(deepseekKey || "");
     if (initial) {
       setForm({ name: initial.name || "", cat: initial.cat || "resistor", qty: initial.qty || 0, min: initial.min || 1, loc: initial.loc || "", mfg: initial.mfg || "", mpn: initial.mpn || "", value: initial.value || "", pkg: initial.pkg || "", notes: initial.notes || "", price: initial.price || 0, imageUrl: initial.imageUrl || "", datasheetUrl: initial.datasheetUrl || "" });
-    } else if (prefill) {
-      setForm({ name: prefill.name || "", cat: prefill.cat || "resistor", qty: prefill.qty || 0, min: 0, loc: "bin-r-1k", mfg: prefill.mfg || "", mpn: prefill.mpn || "", value: prefill.value || "", pkg: prefill.pkg || "", notes: prefill.notes || "", price: 0, imageUrl: "", datasheetUrl: "" });
     } else {
       setForm({ name: initialName || "", cat: "resistor", qty: 0, min: 0, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "" });
     }
   }, [open]);
+
+  const identify = async () => {
+    if (!form.name.trim() || !deepseekKey) return;
+    setIdentifying(true); setAiError(null);
+    try {
+      const catList = window.CATEGORIES.map(c => `${c.id} (${c.label})`).join(", ");
+      const res = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return a JSON object with these fields: name (full descriptive name, e.g. "1kΩ ¼W Carbon Film Resistor"), cat (must be exactly one of: ${catList}), value (component value e.g. "1 kΩ", "100 nF", "5V 1A"), pkg (package type e.g. "Axial", "0805", "DIP-8", "TO-92", "SOT-23"), mfg (typical manufacturer e.g. "Yageo"), mpn (typical part number), notes (one-line description). Return only valid JSON, no markdown.` }],
+          response_format: { type: "json_object" }
+        })
+      });
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.error?.message || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const p = JSON.parse(data.choices[0].message.content);
+      setForm(f => ({
+        ...f,
+        name: p.name || f.name,
+        cat: p.cat || f.cat,
+        value: p.value || f.value,
+        pkg: p.pkg || f.pkg,
+        mfg: p.mfg || f.mfg,
+        mpn: p.mpn || f.mpn,
+        notes: p.notes || f.notes,
+      }));
+    } catch (e) {
+      setAiError(e.message);
+    } finally {
+      setIdentifying(false);
+    }
+  };
+
   if (!open) return null;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const flatLocs = Object.values(LOC_INDEX);
@@ -3078,9 +3119,36 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
           <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={onClose}>{icons.x}</button>
         </div>
         <div className="drawer-body">
+          {/* DeepSeek key setup */}
+          {editingKey ? (
+            <div className="field" style={{ marginBottom: 14 }}>
+              <label>DeepSeek API Key</label>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input className="input mono" type="text" placeholder="sk-…" value={keyDraft} onChange={e => setKeyDraft(e.target.value)} autoFocus
+                  onKeyDown={e => { if (e.key === "Enter" && keyDraft.trim()) { onSaveDeepseekKey(keyDraft.trim()); setEditingKey(false); } }} />
+                <button className="btn sm primary" disabled={!keyDraft.trim()} onClick={() => { onSaveDeepseekKey(keyDraft.trim()); setEditingKey(false); }}>Save</button>
+                <button className="btn sm" onClick={() => setEditingKey(false)}>Cancel</button>
+              </div>
+              <span style={{ fontSize: 11, color: "var(--text-faint)" }}>Get a key at <a href="https://platform.deepseek.com/api_keys" target="_blank" style={{ color: "var(--accent)" }}>platform.deepseek.com</a></span>
+            </div>
+          ) : null}
+
           <div className="field">
             <label>Part name</label>
-            <input className="input" placeholder="e.g. 1kΩ ¼W" value={form.name} onChange={e => set("name", e.target.value)} autoFocus />
+            <div style={{ display: "flex", gap: 6 }}>
+              <input className="input" placeholder="e.g. 1kΩ ¼W" value={form.name} onChange={e => set("name", e.target.value)} autoFocus style={{ flex: 1 }} />
+              <button
+                className="icon-btn bordered"
+                title={deepseekKey ? "Identify with DeepSeek AI" : "Set DeepSeek API key to use AI identify"}
+                style={{ flexShrink: 0, color: identifying ? "var(--text-faint)" : "var(--accent)", width: 32, height: 32 }}
+                disabled={identifying}
+                onClick={() => { if (!deepseekKey) { setEditingKey(true); } else if (form.name.trim()) { identify(); } }}
+              >
+                {identifying ? <span style={{ fontSize: 12 }}>…</span> : icons.sparkle}
+              </button>
+            </div>
+            {aiError && <span style={{ fontSize: 11, color: "var(--danger)", marginTop: 4, display: "block" }}>{aiError}</span>}
+            {!deepseekKey && !editingKey && <span style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2, display: "block" }}>✦ <button style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", font: "inherit", fontSize: 11, padding: 0 }} onClick={() => setEditingKey(true)}>Set API key</button> to auto-fill fields from part name</span>}
           </div>
           <div className="row-2">
             <div className="field">
@@ -3372,184 +3440,12 @@ function ConfirmDeletePartModal({ part, projects, onConfirm, onClose }) {
   );
 }
 
-// ---------- AI Scan Drawer ----------
-
-function AIScanDrawer({ open, onClose, geminiKey, onSaveKey, onAddPart }) {
-  const [keyDraft, setKeyDraft] = React.useState("");
-  const [editingKey, setEditingKey] = React.useState(false);
-  const [image, setImage] = React.useState(null);
-  const [dragHover, setDragHover] = React.useState(false);
-  const [scanning, setScanning] = React.useState(false);
-  const [results, setResults] = React.useState(null);
-  const [error, setError] = React.useState(null);
-
-  React.useEffect(() => {
-    if (open) {
-      setImage(null); setResults(null); setError(null);
-      setKeyDraft(geminiKey || "");
-      setEditingKey(!geminiKey);
-    }
-  }, [open]);
-
-  if (!open) return null;
-
-  const handleFile = (file) => {
-    if (!file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      setImage({ dataUrl: e.target.result, base64: e.target.result.split(",")[1], mimeType: file.type });
-      setResults(null); setError(null);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const scan = async () => {
-    if (!image || !geminiKey) return;
-    setScanning(true); setError(null);
-    try {
-      const catList = window.CATEGORIES.map(c => `${c.id} (${c.label})`).join(", ");
-      const prompt = `Analyze this image of electronic component(s). Identify all visible parts. Return a JSON array where each item has: name (e.g. "1kΩ ¼W Resistor"), cat (must be one of: ${catList}), value (e.g. "1 kΩ", "100 nF"), pkg (package e.g. "0805", "DIP-8", "TO-92", "Axial"), mfg (manufacturer if visible), mpn (part number if visible), qty (count visible in image, default 1), notes (brief observations). Return only valid JSON array, no markdown fences.`;
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [
-              { inlineData: { mimeType: image.mimeType, data: image.base64 } },
-              { text: prompt }
-            ]}],
-            generationConfig: { responseMimeType: "application/json" }
-          })
-        }
-      );
-      if (!res.ok) {
-        const e = await res.json();
-        throw new Error(e.error?.message || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error("Empty response from Gemini");
-      const parsed = JSON.parse(text);
-      setResults(Array.isArray(parsed) ? parsed : [parsed]);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  return (
-    <>
-      <div className="modal-backdrop" onClick={onClose}></div>
-      <aside className="drawer">
-        <div className="drawer-head">
-          <span className="icon" style={{ color: "var(--accent)" }}>{icons.sparkle}</span>
-          <h3>Scan with AI</h3>
-          <span className="muted" style={{ fontSize: 12 }}>Gemini 2.0 Flash Lite</span>
-          <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={onClose}>{icons.x}</button>
-        </div>
-        <div className="drawer-body">
-
-          {/* API key */}
-          {editingKey ? (
-            <div className="field" style={{ marginBottom: 16 }}>
-              <label>Gemini API Key</label>
-              <input className="input mono" type="text" placeholder="AIzaSy…" value={keyDraft}
-                onChange={e => setKeyDraft(e.target.value)} autoFocus
-                onKeyDown={e => { if (e.key === "Enter" && keyDraft.trim()) { onSaveKey(keyDraft.trim()); setEditingKey(false); } }}
-              />
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-                <span style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                  Free key at <a href="https://aistudio.google.com/app/apikey" target="_blank" style={{ color: "var(--accent)" }}>aistudio.google.com</a>
-                </span>
-                <button className="btn sm primary" disabled={!keyDraft.trim()} onClick={() => { onSaveKey(keyDraft.trim()); setEditingKey(false); }}>Save key</button>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, fontSize: 12 }}>
-              <span style={{ color: "var(--success)" }}>●</span>
-              <span style={{ color: "var(--text-muted)" }}>Gemini API key set</span>
-              <button className="btn sm ghost" style={{ marginLeft: "auto" }} onClick={() => setEditingKey(true)}>Change</button>
-            </div>
-          )}
-
-          {/* Drop zone */}
-          <div
-            className={"dropzone" + (dragHover ? " hover" : "")}
-            style={{ cursor: "pointer", marginBottom: 12, minHeight: 140 }}
-            onDragOver={e => { e.preventDefault(); setDragHover(true); }}
-            onDragLeave={() => setDragHover(false)}
-            onDrop={e => { e.preventDefault(); setDragHover(false); handleFile(e.dataTransfer.files[0]); }}
-            onClick={() => { const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.onchange = e => handleFile(e.target.files[0]); inp.click(); }}
-          >
-            {image ? (
-              <img src={image.dataUrl} alt="" style={{ width: "100%", maxHeight: 220, objectFit: "contain" }} />
-            ) : (
-              <div className="placeholder" style={{ width: "100%", height: "100%" }}>
-                <div>
-                  <div className="big">Drop component photo here</div>
-                  <div style={{ marginTop: 4 }}>or click to browse · jpg · png · webp</div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {image && !results && (
-            <button className="btn primary" style={{ width: "100%" }} disabled={scanning || !geminiKey} onClick={scan}>
-              {scanning
-                ? <><span style={{ display: "inline-block", marginRight: 6 }}>⏳</span>Scanning…</>
-                : <><span className="icon" style={{ color: "inherit" }}>{icons.sparkle}</span>Identify parts</>}
-            </button>
-          )}
-
-          {image && results && (
-            <button className="btn sm ghost" style={{ width: "100%", marginBottom: 8 }} onClick={() => { setResults(null); }}>
-              ↺ Scan again
-            </button>
-          )}
-
-          {error && (
-            <div style={{ color: "var(--danger)", fontSize: 13, marginTop: 8, padding: "8px 10px", background: "var(--danger-soft)", borderRadius: 6 }}>
-              {error}
-            </div>
-          )}
-
-          {results && (
-            <div style={{ marginTop: 4 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>
-                {results.length} part{results.length !== 1 ? "s" : ""} detected
-              </div>
-              {results.map((p, i) => (
-                <div key={i} style={{ border: "1px solid var(--border)", borderRadius: 8, padding: "10px 12px", marginBottom: 8, background: "var(--surface-2)" }}>
-                  <div style={{ fontWeight: 500, marginBottom: 4 }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
-                    {p.cat && <CatChip cat={p.cat} />}
-                    {p.value && <span className="chip">{p.value}</span>}
-                    {p.pkg && <span className="chip mono">{p.pkg}</span>}
-                    {p.qty > 1 && <span className="chip">×{p.qty}</span>}
-                    {p.mfg && <span>{p.mfg}</span>}
-                  </div>
-                  {p.notes && <div style={{ fontSize: 11.5, color: "var(--text-faint)", marginBottom: 8 }}>{p.notes}</div>}
-                  <button className="btn sm primary" onClick={() => onAddPart(p)}>
-                    <span className="icon">{icons.plus}</span>Add to inventory
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </aside>
-    </>
-  );
-}
-
-Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, AIScanDrawer });
+Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal });
 
   </script>
 
   <script type="text/babel">
-/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, AIScanDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
+/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
 
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -3676,9 +3572,7 @@ function App() {
   const [ghToken, setGhToken] = useState(() => localStorage.getItem("diy-gh-token") || "");
   const [gistId, setGistId] = useState(() => localStorage.getItem("diy-gist-id") || "");
   const [syncStatus, setSyncStatus] = useState(null);
-  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem("diy-gemini-key") || "");
-  const [aiScanOpen, setAiScanOpen] = useState(false);
-  const [scanPrefill, setScanPrefill] = useState(null);
+  const [deepseekKey, setDeepseekKey] = useState(() => localStorage.getItem("diy-deepseek-key") || "");
   const syncTimer = useRef(null);
   const syncPausedUntil = useRef(0);
 
@@ -4032,7 +3926,6 @@ function App() {
           crumbs={crumbs}
           onOpenPalette={() => setPaletteOpen(true)}
           onAddPart={() => setAddOpen(true)}
-          onAIScan={() => setAiScanOpen(true)}
           setMobileOpen={setMobileOpen}
           exportParts={exportParts}
           importParts={importParts}
@@ -4052,15 +3945,8 @@ function App() {
         addProject={() => setNewProjectOpen(true)}
       />
 
-      <AddPartDrawer open={addOpen} onClose={() => { setAddOpen(false); setAddPartInitialName(""); setPendingBomProject(null); setScanPrefill(null); }} onCreate={createPart} initialName={addPartInitialName} prefill={scanPrefill} />
-      <AddPartDrawer open={!!editPartTarget} onClose={() => setEditPartTarget(null)} initial={editPartTarget} onUpdate={(form) => { updatePart(editPartTarget.id, form); addToast({ title: "Part updated", desc: form.name }); }} />
-      <AIScanDrawer
-        open={aiScanOpen}
-        onClose={() => setAiScanOpen(false)}
-        geminiKey={geminiKey}
-        onSaveKey={(key) => { setGeminiKey(key); localStorage.setItem("diy-gemini-key", key); }}
-        onAddPart={(detected) => { setScanPrefill(detected); setAiScanOpen(false); setAddOpen(true); }}
-      />
+      <AddPartDrawer open={addOpen} onClose={() => { setAddOpen(false); setAddPartInitialName(""); setPendingBomProject(null); }} onCreate={createPart} initialName={addPartInitialName} deepseekKey={deepseekKey} onSaveDeepseekKey={(key) => { setDeepseekKey(key); localStorage.setItem("diy-deepseek-key", key); }} />
+      <AddPartDrawer open={!!editPartTarget} onClose={() => setEditPartTarget(null)} initial={editPartTarget} onUpdate={(form) => { updatePart(editPartTarget.id, form); addToast({ title: "Part updated", desc: form.name }); }} deepseekKey={deepseekKey} onSaveDeepseekKey={(key) => { setDeepseekKey(key); localStorage.setItem("diy-deepseek-key", key); }} />
       <ConfirmDeletePartModal
         part={deletePartTarget}
         projects={projects}
