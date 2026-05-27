@@ -3410,7 +3410,7 @@ function AIScanDrawer({ open, onClose, geminiKey, onSaveKey, onAddPart }) {
       const catList = window.CATEGORIES.map(c => `${c.id} (${c.label})`).join(", ");
       const prompt = `Analyze this image of electronic component(s). Identify all visible parts. Return a JSON array where each item has: name (e.g. "1kΩ ¼W Resistor"), cat (must be one of: ${catList}), value (e.g. "1 kΩ", "100 nF"), pkg (package e.g. "0805", "DIP-8", "TO-92", "Axial"), mfg (manufacturer if visible), mpn (part number if visible), qty (count visible in image, default 1), notes (brief observations). Return only valid JSON array, no markdown fences.`;
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -3446,7 +3446,7 @@ function AIScanDrawer({ open, onClose, geminiKey, onSaveKey, onAddPart }) {
         <div className="drawer-head">
           <span className="icon" style={{ color: "var(--accent)" }}>{icons.sparkle}</span>
           <h3>Scan with AI</h3>
-          <span className="muted" style={{ fontSize: 12 }}>Gemini 2.0 Flash</span>
+          <span className="muted" style={{ fontSize: 12 }}>Gemini 2.0 Flash Lite</span>
           <button className="icon-btn" style={{ marginLeft: "auto" }} onClick={onClose}>{icons.x}</button>
         </div>
         <div className="drawer-body">
