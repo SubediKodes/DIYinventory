@@ -3483,6 +3483,7 @@ function App() {
   const [gistId, setGistId] = useState(() => localStorage.getItem("diy-gist-id") || "");
   const [syncStatus, setSyncStatus] = useState(null);
   const syncTimer = useRef(null);
+  const syncPausedUntil = useRef(0);
 
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
 
@@ -3517,6 +3518,7 @@ function App() {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
     if (!ghToken) return;
     clearTimeout(syncTimer.current);
+    if (Date.now() < syncPausedUntil.current) return;
     syncTimer.current = setTimeout(async () => {
       setSyncStatus({ ok: true, msg: "Syncing…" });
       try {
@@ -3558,15 +3560,39 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveGistSettings = useCallback((token, id) => {
+  const saveGistSettings = useCallback(async (token, id) => {
     setGhToken(token);
     setGistId(id);
     localStorage.setItem("diy-gh-token", token);
     localStorage.setItem("diy-gist-id", id);
-    if (!token) { setSyncStatus(null); }
     setGistOpen(false);
-    if (token) addToast({ title: id ? "Gist sync connected" : "Gist sync ready — will create Gist on next change" });
-    else addToast({ kind: "warn", title: "Gist sync disconnected" });
+    if (!token) {
+      setSyncStatus(null);
+      addToast({ kind: "warn", title: "Gist sync disconnected" });
+      return;
+    }
+    if (id) {
+      // Existing Gist: pause push and pull remote data first to avoid overwriting it
+      syncPausedUntil.current = Date.now() + 8000;
+      setSyncStatus({ ok: true, msg: "Loading from Gist…" });
+      try {
+        const res = await fetch(`https://api.github.com/gists/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) throw new Error(`GitHub ${res.status}`);
+        const data = await res.json();
+        const content = data.files?.["parts.json"]?.content;
+        const projContent = data.files?.["projects.json"]?.content;
+        if (content) setParts(JSON.parse(content));
+        if (projContent) setProjects(JSON.parse(projContent));
+        setSyncStatus({ ok: true, msg: `Loaded from Gist ${id.slice(0, 8)}… ✓` });
+        addToast({ title: "Gist sync connected", desc: "Data loaded from Gist" });
+      } catch (err) {
+        syncPausedUntil.current = 0;
+        setSyncStatus({ ok: false, msg: `Failed to load: ${err.message}` });
+        addToast({ kind: "warn", title: "Could not load Gist", desc: err.message });
+      }
+    } else {
+      addToast({ title: "Gist sync ready — will create Gist on next change" });
+    }
   }, [addToast]);
 
   // Apply tweaks
