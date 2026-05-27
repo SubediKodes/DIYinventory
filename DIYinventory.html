@@ -3455,7 +3455,7 @@ function AIScanDrawer({ open, onClose, geminiKey, onSaveKey, onAddPart }) {
           {editingKey ? (
             <div className="field" style={{ marginBottom: 16 }}>
               <label>Gemini API Key</label>
-              <input className="input mono" type="password" placeholder="AIzaSy…" value={keyDraft}
+              <input className="input mono" type="text" placeholder="AIzaSy…" value={keyDraft}
                 onChange={e => setKeyDraft(e.target.value)} autoFocus
                 onKeyDown={e => { if (e.key === "Enter" && keyDraft.trim()) { onSaveKey(keyDraft.trim()); setEditingKey(false); } }}
               />
@@ -3603,7 +3603,7 @@ function GistSyncModal({ open, onClose, onSave, currentToken, currentGistId, syn
               <label>GitHub Personal Access Token</label>
               <input
                 className="input mono"
-                type="password"
+                type="text"
                 name="github-token"
                 autoComplete="current-password"
                 placeholder="ghp_…"
