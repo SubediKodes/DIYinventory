@@ -3079,7 +3079,7 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
         body: JSON.stringify({
           model: "deepseek-chat",
-          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return ONLY a JSON object (no markdown) with these exact fields:\n- name: canonical expanded name, never echo the input verbatim (e.g. "bc547" → "BC547 NPN General Purpose Transistor")\n- cat: must be exactly one of: ${catList}\n- value: component value (e.g. "1 kΩ", "100 nF", "5V 1A")\n- pkg: package (e.g. "TO-92", "0805", "DIP-8", "Axial")\n- mfg: typical manufacturer name\n- mpn: real manufacturer part number\n- notes: one-line description\n- datasheetUrl: NEVER return empty — use the manufacturer PDF URL if you know it (e.g. https://www.onsemi.com/pdf/datasheet/bc547-d.pdf), otherwise always fall back to https://www.alldatasheet.com/search.jsp?Searchword=MPN\n- imageUrl: direct image URL from the manufacturer website or a distributor (Digikey/Mouser); return empty string only if completely unknown` }],
+          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return ONLY a JSON object (no markdown) with these exact fields:\n- name: canonical expanded name, never echo the input verbatim (e.g. "bc547" → "BC547 NPN General Purpose Transistor")\n- cat: must be exactly one of: ${catList}\n- value: component value (e.g. "1 kΩ", "100 nF", "5V 1A")\n- pkg: package (e.g. "TO-92", "0805", "DIP-8", "Axial")\n- mfg: typical manufacturer name\n- mpn: real manufacturer part number\n- notes: one-line description\n- imageUrl: a real direct image URL for this component — use image URLs you know from training data such as manufacturer product page images, Digikey CDN (https://media.digikey.com/photos/...), Mouser, or LCSC (https://assets.lcsc.com/images/lcsc/...). Return empty string only for completely unknown parts.` }],
           response_format: { type: "json_object" }
         })
       });
@@ -3089,9 +3089,6 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
       }
       const data = await res.json();
       const p = JSON.parse(data.choices[0].message.content);
-      const mpn = p.mpn || f.mpn;
-      const datasheetUrl = p.datasheetUrl ||
-        (mpn ? `https://www.alldatasheet.com/search.jsp?Searchword=${encodeURIComponent(mpn)}` : "");
       setForm(f => ({
         ...f,
         name: p.name || f.name,
@@ -3099,9 +3096,8 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         value: p.value || f.value,
         pkg: p.pkg || f.pkg,
         mfg: p.mfg || f.mfg,
-        mpn: mpn || f.mpn,
+        mpn: p.mpn || f.mpn,
         notes: p.notes || f.notes,
-        datasheetUrl: datasheetUrl || f.datasheetUrl,
         imageUrl: p.imageUrl || f.imageUrl,
       }));
     } catch (e) {
