@@ -3079,7 +3079,7 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
         body: JSON.stringify({
           model: "deepseek-chat",
-          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return a JSON object with these fields: name (full descriptive name, e.g. "1kΩ ¼W Carbon Film Resistor"), cat (must be exactly one of: ${catList}), value (component value e.g. "1 kΩ", "100 nF", "5V 1A"), pkg (package type e.g. "Axial", "0805", "DIP-8", "TO-92", "SOT-23"), mfg (typical manufacturer e.g. "Yageo"), mpn (typical part number), notes (one-line description). Return only valid JSON, no markdown.` }],
+          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return a JSON object with these fields: name (full descriptive name, e.g. "1kΩ ¼W Carbon Film Resistor"), cat (must be exactly one of: ${catList}), value (component value e.g. "1 kΩ", "100 nF", "5V 1A"), pkg (package type e.g. "Axial", "0805", "DIP-8", "TO-92", "SOT-23"), mfg (typical manufacturer e.g. "Yageo"), mpn (a real manufacturer part number), notes (one-line description), datasheetUrl (direct URL to the official datasheet PDF for this exact part — from the manufacturer or a distributor like Digikey/Mouser/LCSC; leave empty string if unknown), imageUrl (direct URL to a product image, preferably from the manufacturer or a reputable distributor like Digikey/Mouser; leave empty string if unknown). Return only valid JSON, no markdown.` }],
           response_format: { type: "json_object" }
         })
       });
@@ -3098,6 +3098,8 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         mfg: p.mfg || f.mfg,
         mpn: p.mpn || f.mpn,
         notes: p.notes || f.notes,
+        datasheetUrl: p.datasheetUrl || f.datasheetUrl,
+        imageUrl: p.imageUrl || f.imageUrl,
       }));
     } catch (e) {
       setAiError(e.message);
