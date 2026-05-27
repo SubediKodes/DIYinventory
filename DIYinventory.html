@@ -2606,6 +2606,27 @@ function PartDetail({ part, parts, navigate, updatePart, addToast, onEdit, onDel
                   {part.notes || <span className="faint">No notes yet. Click Edit to add some.</span>}
                 </div>
               )}
+              {(() => {
+                const s = part.specs || {};
+                const items = [
+                  { label: "Voltage", v: s.voltage },
+                  { label: "Current", v: s.current },
+                  { label: "Power", v: s.power },
+                  { label: "Tolerance", v: s.tolerance },
+                  { label: "Frequency", v: s.frequency },
+                  { label: "Temp", v: s.tempRange },
+                ].filter(x => x.v);
+                if (!items.length) return null;
+                return (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: part.notes ? "1px solid var(--border)" : "none", display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {items.map(x => (
+                      <span key={x.label} style={{ fontSize: 12, padding: "3px 9px", background: "var(--bg-sunk)", border: "1px solid var(--border)", borderRadius: 5, fontFamily: "Geist Mono, monospace" }}>
+                        <span style={{ color: "var(--text-faint)", marginRight: 5 }}>{x.label}</span>{x.v}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -3053,10 +3074,12 @@ function StatCardMini({ label, value, sub, good }) {
 
 // ---------- Add Part Drawer ----------
 
+const EMPTY_SPECS = { voltage: "", current: "", power: "", tolerance: "", frequency: "", tempRange: "" };
+
 function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial, deepseekKey, onSaveDeepseekKey }) {
   const editing = !!initial;
   const [form, setForm] = useState({
-    name: "", cat: "resistor", qty: 0, min: 1, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "",
+    name: "", cat: "resistor", qty: 0, min: 1, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "", specs: { ...EMPTY_SPECS },
   });
   const [identifying, setIdentifying] = useState(false);
   const [aiError, setAiError] = useState(null);
@@ -3067,9 +3090,9 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
     if (!open) return;
     setAiError(null); setEditingKey(false); setKeyDraft(deepseekKey || "");
     if (initial) {
-      setForm({ name: initial.name || "", cat: initial.cat || "resistor", qty: initial.qty || 0, min: initial.min || 1, loc: initial.loc || "", mfg: initial.mfg || "", mpn: initial.mpn || "", value: initial.value || "", pkg: initial.pkg || "", notes: initial.notes || "", price: initial.price || 0, imageUrl: initial.imageUrl || "", datasheetUrl: initial.datasheetUrl || "" });
+      setForm({ name: initial.name || "", cat: initial.cat || "resistor", qty: initial.qty || 0, min: initial.min || 1, loc: initial.loc || "", mfg: initial.mfg || "", mpn: initial.mpn || "", value: initial.value || "", pkg: initial.pkg || "", notes: initial.notes || "", price: initial.price || 0, imageUrl: initial.imageUrl || "", datasheetUrl: initial.datasheetUrl || "", specs: { ...EMPTY_SPECS, ...(initial.specs || {}) } });
     } else {
-      setForm({ name: initialName || "", cat: "resistor", qty: 0, min: 0, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "" });
+      setForm({ name: initialName || "", cat: "resistor", qty: 0, min: 0, loc: "bin-r-1k", mfg: "", mpn: "", value: "", pkg: "", notes: "", price: 0, imageUrl: "", datasheetUrl: "", specs: { ...EMPTY_SPECS } });
     }
   }, [open]);
 
@@ -3112,6 +3135,7 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
 
   if (!open) return null;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const setSpec = (k, v) => setForm(f => ({ ...f, specs: { ...(f.specs || {}), [k]: v } }));
   const flatLocs = Object.values(LOC_INDEX);
   return (
     <>
@@ -3206,6 +3230,26 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
             <label>Notes</label>
             <textarea className="textarea" value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Pull-up workhorse · 5% carbon film…" />
           </div>
+          <details style={{ marginBottom: 12 }}>
+            <summary style={{ cursor: "pointer", fontSize: 11.5, color: "var(--text-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em", userSelect: "none", listStyle: "none", display: "flex", alignItems: "center", gap: 5, marginBottom: 2 }}>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ transition: "transform 0.15s" }}><polyline points="9 18 15 12 9 6" /></svg>
+              Extended Specifications
+            </summary>
+            <div style={{ marginTop: 10 }}>
+              <div className="row-2">
+                <div className="field"><label>Voltage</label><input className="input mono" placeholder="3.3V – 5V" value={form.specs?.voltage || ""} onChange={e => setSpec("voltage", e.target.value)} /></div>
+                <div className="field"><label>Current</label><input className="input mono" placeholder="200 mA" value={form.specs?.current || ""} onChange={e => setSpec("current", e.target.value)} /></div>
+              </div>
+              <div className="row-2">
+                <div className="field"><label>Power</label><input className="input mono" placeholder="0.25 W" value={form.specs?.power || ""} onChange={e => setSpec("power", e.target.value)} /></div>
+                <div className="field"><label>Tolerance</label><input className="input mono" placeholder="5%" value={form.specs?.tolerance || ""} onChange={e => setSpec("tolerance", e.target.value)} /></div>
+              </div>
+              <div className="row-2">
+                <div className="field"><label>Frequency</label><input className="input mono" placeholder="100 MHz" value={form.specs?.frequency || ""} onChange={e => setSpec("frequency", e.target.value)} /></div>
+                <div className="field"><label>Temp Range</label><input className="input mono" placeholder="-40°C to 85°C" value={form.specs?.tempRange || ""} onChange={e => setSpec("tempRange", e.target.value)} /></div>
+              </div>
+            </div>
+          </details>
           <div className="field">
             <label>Image URL <span style={{ fontWeight: 400, textTransform: "none" }}>(optional · or paste an Amazon link)</span></label>
             <input className="input" placeholder="https://… or https://amazon.com/dp/…" value={form.imageUrl} onChange={e => set("imageUrl", e.target.value)} />
