@@ -2204,9 +2204,6 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                   <span className="sort" onClick={() => toggleSort("qty")}>Qty <span className="icon">{sortIcon("qty")}</span></span>
                 </th>
                 <th style={{ minWidth: 200 }}>Location</th>
-                <th style={{ width: 110 }}>
-                  <span className="sort" onClick={() => toggleSort("mfg")}>Manufacturer <span className="icon">{sortIcon("mfg")}</span></span>
-                </th>
                 <th style={{ width: 160 }}>Notes</th>
                 <th style={{ width: 80 }}>Datasheet</th>
                 <th style={{ width: 36 }}></th>
@@ -2214,7 +2211,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan="9" style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>No parts match your filters.</td></tr>
+                <tr><td colSpan="8" style={{ padding: 40, textAlign: "center", color: "var(--text-faint)" }}>No parts match your filters.</td></tr>
               )}
               {filtered.map(p => {
                 const cat = window.CATEGORIES.find(c => c.id === p.cat);
@@ -2271,17 +2268,6 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                       )}
                     </td>
                     <td><LocPath id={p.loc} /></td>
-                    <td style={{ maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {isEdit("mfg") ? (
-                        <input
-                          className="cell-input" autoFocus defaultValue={p.mfg}
-                          onBlur={(e) => { updatePart(p.id, { mfg: e.target.value }); setEditing(null); }}
-                          onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
-                        />
-                      ) : (
-                        <span onDoubleClick={() => setEditing({ id: p.id, field: "mfg" })}>{p.mfg}</span>
-                      )}
-                    </td>
                     <td style={{ color: "var(--text-muted)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {isEdit("notes") ? (
                         <input
@@ -3106,7 +3092,7 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
         body: JSON.stringify({
           model: "deepseek-chat",
-          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return ONLY a JSON object (no markdown) with these exact fields:\n- name: canonical expanded name, never echo the input verbatim (e.g. "bc547" → "BC547 NPN General Purpose Transistor")\n- cat: must be exactly one of: ${catList}\n- value: component value (e.g. "1 kΩ", "100 nF", "5V 1A")\n- pkg: package (e.g. "TO-92", "0805", "DIP-8", "Axial")\n- mfg: typical manufacturer name\n- mpn: real manufacturer part number\n- notes: one-line description` }],
+          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return ONLY a JSON object (no markdown) with these exact fields:\n- name: canonical expanded name, never echo the input verbatim (e.g. "bc547" → "BC547 NPN General Purpose Transistor")\n- cat: must be exactly one of: ${catList}\n- value: component value (e.g. "1 kΩ", "100 nF", "5V 1A")\n- pkg: package (e.g. "TO-92", "0805", "DIP-8", "Axial")\n- mpn: real manufacturer part number\n- notes: one-line description` }],
           response_format: { type: "json_object" }
         })
       });
@@ -3122,7 +3108,6 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         cat: p.cat || f.cat,
         value: p.value || f.value,
         pkg: p.pkg || f.pkg,
-        mfg: p.mfg || f.mfg,
         mpn: p.mpn || f.mpn,
         notes: p.notes || f.notes,
       }));
