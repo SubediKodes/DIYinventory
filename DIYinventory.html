@@ -1536,6 +1536,16 @@ function removeFromTree(nodes, id) {
   );
 }
 
+function extractAmazonImage(url) {
+  if (!url) return url;
+  // Detect any Amazon domain (amazon.com, amazon.be, amazon.co.uk, amazon.de, etc.)
+  if (!/amazon\./i.test(url)) return url;
+  // ASIN is a 10-char alphanumeric string after /dp/ or /gp/product/
+  const m = url.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
+  if (!m) return url;
+  return `https://images-na.ssl-images-amazon.com/images/P/${m[1]}.01.LZZZZZZZ.jpg`;
+}
+
 window.CATEGORIES = CATEGORIES;
 window.LOCATIONS = LOCATIONS;
 window.LOC_INDEX = LOC_INDEX;
@@ -1545,6 +1555,7 @@ window.genHistory = genHistory;
 window.addChildToTree = addChildToTree;
 window.renameInTree = renameInTree;
 window.removeFromTree = removeFromTree;
+window.extractAmazonImage = extractAmazonImage;
 
   </script>
 
@@ -1808,7 +1819,7 @@ Object.assign(window, { Sidebar, Topbar, CommandPalette, Toasts });
   </script>
 
   <script type="text/babel">
-/* global React, icons, Ic, CATEGORIES, LOC_INDEX, PARTS, PROJECTS, genHistory */
+/* global React, icons, Ic, CATEGORIES, LOC_INDEX, PARTS, PROJECTS, genHistory, extractAmazonImage */
 // Page-level components: Dashboard, PartsList, PartDetail, Storage, Projects/BOM
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -2229,7 +2240,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                       ) : (
                         <div onDoubleClick={() => setEditing({ id: p.id, field: "name" })} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                           {p.imageUrl
-                            ? <img src={p.imageUrl} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid var(--border)", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="inline-block"; }} />
+                            ? <img src={extractAmazonImage(p.imageUrl)} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid var(--border)", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="inline-block"; }} />
                             : null}
                           <span className="cat-dot" style={{ background: cat.color, flexShrink: 0, display: p.imageUrl ? "none" : "" }}></span>
                           <a style={{ fontWeight: 500, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); navigate({ name: "part", id: p.id }); }}>{p.name}</a>
@@ -2372,7 +2383,7 @@ Object.assign(window, { Dashboard, PartsList, StatCard, CatChip, LocPath, status
   </script>
 
   <script type="text/babel">
-/* global React, icons, Ic, CATEGORIES, LOCATIONS, LOC_INDEX, PARTS, PROJECTS, genHistory, statusOf, effectiveMin, CatChip, LocPath */
+/* global React, icons, Ic, CATEGORIES, LOCATIONS, LOC_INDEX, PARTS, PROJECTS, genHistory, statusOf, effectiveMin, extractAmazonImage, CatChip, LocPath */
 // Detail pages: PartDetail, Storage, Projects list, Project detail, AddPartDrawer
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -2447,7 +2458,7 @@ function PartDetail({ part, parts, navigate, updatePart, addToast, onEdit, onDel
               style={{ padding: 0, overflow: "hidden", display: "grid", placeItems: "center", minHeight: 120 }}
             >
               {part.imageUrl ? (
-                <img src={part.imageUrl} alt={part.name} style={{ width: "50%", height: "auto", display: "block", margin: "0 auto", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="grid"; }} />
+                <img src={extractAmazonImage(part.imageUrl)} alt={part.name} style={{ width: "50%", height: "auto", display: "block", margin: "0 auto", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="grid"; }} />
               ) : images.length > 0 ? (
                 <img src={images[0]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
@@ -2461,21 +2472,26 @@ function PartDetail({ part, parts, navigate, updatePart, addToast, onEdit, onDel
             </div>
             <div style={{ marginTop: 8 }}>
               {editingImageUrl ? (
-                <div style={{ display: "flex", gap: 6 }}>
-                  <input
-                    className="input"
-                    style={{ flex: 1, fontSize: 12 }}
-                    placeholder="https://…"
-                    value={imageUrlDraft}
-                    onChange={e => setImageUrlDraft(e.target.value)}
-                    autoFocus
-                    onKeyDown={e => {
-                      if (e.key === "Enter") { updatePart(part.id, { imageUrl: imageUrlDraft }); setEditingImageUrl(false); addToast({ title: "Image updated" }); }
-                      if (e.key === "Escape") { setImageUrlDraft(part.imageUrl || ""); setEditingImageUrl(false); }
-                    }}
-                  />
-                  <button className="btn sm primary" onClick={() => { updatePart(part.id, { imageUrl: imageUrlDraft }); setEditingImageUrl(false); addToast({ title: "Image updated" }); }}>Save</button>
-                  <button className="btn sm" onClick={() => { setImageUrlDraft(part.imageUrl || ""); setEditingImageUrl(false); }}>Cancel</button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      className="input"
+                      style={{ flex: 1, fontSize: 12 }}
+                      placeholder="https://… or amazon.com/dp/…"
+                      value={imageUrlDraft}
+                      onChange={e => setImageUrlDraft(e.target.value)}
+                      autoFocus
+                      onKeyDown={e => {
+                        if (e.key === "Enter") { updatePart(part.id, { imageUrl: imageUrlDraft }); setEditingImageUrl(false); addToast({ title: "Image updated" }); }
+                        if (e.key === "Escape") { setImageUrlDraft(part.imageUrl || ""); setEditingImageUrl(false); }
+                      }}
+                    />
+                    <button className="btn sm primary" onClick={() => { updatePart(part.id, { imageUrl: imageUrlDraft }); setEditingImageUrl(false); addToast({ title: "Image updated" }); }}>Save</button>
+                    <button className="btn sm" onClick={() => { setImageUrlDraft(part.imageUrl || ""); setEditingImageUrl(false); }}>Cancel</button>
+                  </div>
+                  {imageUrlDraft && extractAmazonImage(imageUrlDraft) !== imageUrlDraft && (
+                    <span style={{ fontSize: 11, color: "var(--accent)" }}>Amazon link detected — image will be resolved automatically</span>
+                  )}
                 </div>
               ) : (
                 <button className="btn sm ghost" style={{ width: "100%" }} onClick={() => { setImageUrlDraft(part.imageUrl || ""); setEditingImageUrl(true); }}>
@@ -3116,10 +3132,13 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
             <textarea className="textarea" value={form.notes} onChange={e => set("notes", e.target.value)} placeholder="Pull-up workhorse · 5% carbon film…" />
           </div>
           <div className="field">
-            <label>Image URL <span style={{ fontWeight: 400, textTransform: "none" }}>(optional)</span></label>
-            <input className="input" placeholder="https://…" value={form.imageUrl} onChange={e => set("imageUrl", e.target.value)} />
+            <label>Image URL <span style={{ fontWeight: 400, textTransform: "none" }}>(optional · or paste an Amazon link)</span></label>
+            <input className="input" placeholder="https://… or https://amazon.com/dp/…" value={form.imageUrl} onChange={e => set("imageUrl", e.target.value)} />
+            {form.imageUrl && extractAmazonImage(form.imageUrl) !== form.imageUrl && (
+              <span style={{ fontSize: 11, color: "var(--accent)" }}>Amazon link detected — image will be resolved automatically</span>
+            )}
             {form.imageUrl && (
-              <img src={form.imageUrl} alt="" style={{ marginTop: 8, width: "100%", maxHeight: 160, objectFit: "contain", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-sunk)" }} onError={e => e.target.style.display="none"} onLoad={e => e.target.style.display=""} />
+              <img src={extractAmazonImage(form.imageUrl)} alt="" style={{ marginTop: 8, width: "100%", maxHeight: 160, objectFit: "contain", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-sunk)" }} onError={e => e.target.style.display="none"} onLoad={e => e.target.style.display=""} />
             )}
           </div>
           <div className="field">
