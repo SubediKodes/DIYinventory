@@ -95,8 +95,8 @@ a { color: inherit; text-decoration: none; }
 }
 @media (max-width: 880px) {
   .app { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
-  .sidebar.open { display: flex; position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 80; box-shadow: var(--shadow-lg); }
+  .sidebar { display: none !important; }
+  .sidebar.open { display: flex !important; position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 80; box-shadow: var(--shadow-lg); }
   .mobile-scrim { display: block !important; }
 }
 
