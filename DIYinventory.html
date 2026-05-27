@@ -3079,7 +3079,7 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
         body: JSON.stringify({
           model: "deepseek-chat",
-          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return a JSON object with these fields: name (canonical expanded name — do NOT echo back the input; always expand to a proper full name, e.g. input "bc547" → "BC547 NPN General Purpose Transistor", input "1k resistor" → "1kΩ ¼W Carbon Film Resistor"), cat (must be exactly one of: ${catList}), value (component value e.g. "1 kΩ", "100 nF", "5V 1A"), pkg (package type e.g. "Axial", "0805", "DIP-8", "TO-92", "SOT-23"), mfg (typical manufacturer e.g. "Yageo"), mpn (a real manufacturer part number), notes (one-line description), datasheetUrl (direct URL to the official datasheet PDF for this exact part — from the manufacturer or a distributor like Digikey/Mouser/LCSC; leave empty string if unknown), imageUrl (direct URL to a product image, preferably from the manufacturer or a reputable distributor like Digikey/Mouser; leave empty string if unknown). Return only valid JSON, no markdown.` }],
+          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return ONLY a JSON object (no markdown) with these exact fields:\n- name: canonical expanded name, never echo the input verbatim (e.g. "bc547" → "BC547 NPN General Purpose Transistor")\n- cat: must be exactly one of: ${catList}\n- value: component value (e.g. "1 kΩ", "100 nF", "5V 1A")\n- pkg: package (e.g. "TO-92", "0805", "DIP-8", "Axial")\n- mfg: typical manufacturer name\n- mpn: real manufacturer part number\n- notes: one-line description\n- datasheetUrl: NEVER return empty — use the manufacturer PDF URL if you know it (e.g. https://www.onsemi.com/pdf/datasheet/bc547-d.pdf), otherwise always fall back to https://www.alldatasheet.com/search.jsp?Searchword=MPN\n- imageUrl: direct image URL from the manufacturer website or a distributor (Digikey/Mouser); return empty string only if completely unknown` }],
           response_format: { type: "json_object" }
         })
       });
@@ -3089,6 +3089,9 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
       }
       const data = await res.json();
       const p = JSON.parse(data.choices[0].message.content);
+      const mpn = p.mpn || f.mpn;
+      const datasheetUrl = p.datasheetUrl ||
+        (mpn ? `https://www.alldatasheet.com/search.jsp?Searchword=${encodeURIComponent(mpn)}` : "");
       setForm(f => ({
         ...f,
         name: p.name || f.name,
@@ -3096,9 +3099,9 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         value: p.value || f.value,
         pkg: p.pkg || f.pkg,
         mfg: p.mfg || f.mfg,
-        mpn: p.mpn || f.mpn,
+        mpn: mpn || f.mpn,
         notes: p.notes || f.notes,
-        datasheetUrl: p.datasheetUrl || f.datasheetUrl,
+        datasheetUrl: datasheetUrl || f.datasheetUrl,
         imageUrl: p.imageUrl || f.imageUrl,
       }));
     } catch (e) {
