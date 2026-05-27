@@ -95,9 +95,8 @@ a { color: inherit; text-decoration: none; }
 }
 @media (max-width: 880px) {
   .app { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
-  .sidebar.open { display: flex; position: fixed; inset: 0 auto 0 0; width: 260px; z-index: 80; box-shadow: var(--shadow-lg); }
-  .mobile-scrim { display: block !important; }
+  .sidebar { display: none !important; }
+  .mobile-scrim { display: none !important; }
 }
 
 /* sidebar */
@@ -670,7 +669,41 @@ tr:hover .qty .step { opacity: 1; }
 .mobile-only { display: none; }
 .mobile-scrim { display: none; position: fixed; inset: 0; background: oklch(0 0 0 / 0.4); z-index: 79; }
 @media (max-width: 880px) {
-  .mobile-only { display: inline-flex; }
+  .mobile-only { display: none; }
+}
+
+/* bottom nav (mobile only) */
+.mobile-nav { display: none; }
+@media (max-width: 880px) {
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 56px;
+    background: var(--bg-sunk);
+    border-top: 1px solid var(--border);
+    z-index: 70;
+    align-items: stretch;
+  }
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-faint);
+    font-size: 10px;
+    font-family: inherit;
+    padding: 0;
+    transition: color 100ms;
+  }
+  .mobile-nav-item.active { color: var(--accent); }
+  .mobile-nav-item svg { width: 20px; height: 20px; }
+  .content-inner { padding-bottom: 72px !important; }
 }
   </style>
 </head>
@@ -1821,7 +1854,36 @@ function Toasts({ toasts, dismiss }) {
   );
 }
 
-Object.assign(window, { Sidebar, Topbar, CommandPalette, Toasts });
+function MobileNav({ page, setPage }) {
+  const active = (p) => {
+    if (p === "dashboard") return page === "dashboard";
+    if (p === "parts") return typeof page === "object" ? page.name === "parts" : false;
+    if (p === "storage") return page === "storage";
+    if (p === "projects") return page === "projects" || (typeof page === "object" && page.name === "project");
+    return false;
+  };
+  const go = (p) => {
+    if (p === "parts") setPage({ name: "parts" });
+    else setPage(p);
+  };
+  return (
+    <nav className="mobile-nav">
+      {[
+        { key: "dashboard", label: "Home", icon: icons.dashboard },
+        { key: "parts",     label: "Parts",    icon: icons.parts },
+        { key: "storage",   label: "Storage",  icon: icons.storage },
+        { key: "projects",  label: "Projects", icon: icons.project },
+      ].map(({ key, label, icon }) => (
+        <button key={key} className={"mobile-nav-item" + (active(key) ? " active" : "")} onClick={() => go(key)}>
+          {icon}
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+Object.assign(window, { Sidebar, Topbar, CommandPalette, Toasts, MobileNav });
 
   </script>
 
@@ -3485,7 +3547,7 @@ Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPar
   </script>
 
   <script type="text/babel">
-/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
+/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, MobileNav, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
 
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -4010,6 +4072,7 @@ function App() {
         syncStatus={syncStatus}
       />
 
+      <MobileNav page={page} setPage={setPage} />
       <Toasts toasts={toasts} dismiss={dismissToast} />
 
       <TweaksPanel title="Tweaks">
