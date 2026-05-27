@@ -1931,7 +1931,7 @@ function Dashboard({ parts, projects, navigate }) {
               const cat = window.CATEGORIES.find(c => c.id === p.cat);
               return (
                 <div key={p.id} className="list-row" onClick={() => navigate({ name: "part", id: p.id })} style={{ cursor: "pointer" }}>
-                  <span className="cat-dot" style={{ background: cat.color }}></span>
+                  <span className="cat-dot" style={{ background: cat?.color }}></span>
                   <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
                     <div className="name" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
@@ -1982,7 +1982,7 @@ function Dashboard({ parts, projects, navigate }) {
               const cat = window.CATEGORIES.find(c => c.id === p.cat);
               return (
                 <div key={p.id} className="list-row" style={{ cursor: "pointer" }} onClick={() => navigate({ name: "part", id: p.id })}>
-                  <span className="cat-dot" style={{ background: cat.color }}></span>
+                  <span className="cat-dot" style={{ background: cat?.color }}></span>
                   <div className="col" style={{ flex: 1 }}>
                     <div className="name">{p.name}</div>
                     <div className="meta">{p.mfg} · <span className="mono">{p.mpn}</span></div>
@@ -2242,7 +2242,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                           {p.imageUrl
                             ? <img src={extractAmazonImage(p.imageUrl)} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover", flexShrink: 0, border: "1px solid var(--border)", background: "var(--bg-sunk)" }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="inline-block"; }} />
                             : null}
-                          <span className="cat-dot" style={{ background: cat.color, flexShrink: 0, display: p.imageUrl ? "none" : "" }}></span>
+                          <span className="cat-dot" style={{ background: cat?.color, flexShrink: 0, display: p.imageUrl ? "none" : "" }}></span>
                           <a style={{ fontWeight: 500, cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); navigate({ name: "part", id: p.id }); }}>{p.name}</a>
                           <span className="mono faint" style={{ fontSize: 11 }}>{p.value}</span>
                         </div>
@@ -2771,7 +2771,7 @@ function Storage({ parts, navigate, locations, locIndex, addLocation, renameLoca
                   const st = statusOf(p);
                   return (
                     <tr key={p.id} onClick={() => navigate({ name: "part", id: p.id })} style={{ cursor: "pointer" }}>
-                      <td><span className="cat-dot" style={{ background: cat.color }}></span></td>
+                      <td><span className="cat-dot" style={{ background: cat?.color }}></span></td>
                       <td><span style={{ fontWeight: 500 }}>{p.name}</span> <span className="mono faint" style={{ fontSize: 11, marginLeft: 6 }}>{p.mpn}</span></td>
                       <td><CatChip cat={p.cat} /></td>
                       <td className="cell-num">{p.qty}</td>
@@ -2995,7 +2995,7 @@ function ProjectDetail({ project, parts, navigate, addToast, deleteProject, onEd
                 const enough = part.qty >= b.need;
                 return (
                   <tr key={b.partId} onClick={() => navigate({ name: "part", id: part.id })} style={{ cursor: "pointer" }}>
-                    <td><span className="cat-dot" style={{ background: cat.color }}></span></td>
+                    <td><span className="cat-dot" style={{ background: cat?.color }}></span></td>
                     <td>
                       <span style={{ fontWeight: 500 }}>{part.name}</span>
                       <span className="mono faint" style={{ fontSize: 11, marginLeft: 6 }}>{part.mpn}</span>
@@ -3350,7 +3350,7 @@ function AddBomLineDrawer({ open, onClose, parts, existingIds, onAdd, onCreateNe
                   style={{ cursor: "pointer", background: isSel ? "var(--accent-soft)" : undefined }}
                   onClick={() => setSelected(isSel ? null : p.id)}
                 >
-                  <span className="cat-dot" style={{ background: cat.color }}></span>
+                  <span className="cat-dot" style={{ background: cat?.color }}></span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 500, display: "flex", gap: 8, alignItems: "center" }}>
                       {p.name}
