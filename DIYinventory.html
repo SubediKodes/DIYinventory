@@ -2194,7 +2194,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                     {!allChecked && someChecked && <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3"><line x1="5" y1="12" x2="19" y2="12" /></svg>}
                   </div>
                 </th>
-                <th style={{ minWidth: 200 }}>
+                <th style={{ minWidth: 260 }}>
                   <span className="sort" onClick={() => toggleSort("name")}>Part name <span className="icon">{sortIcon("name")}</span></span>
                 </th>
                 <th style={{ width: 130 }}>
@@ -2204,10 +2204,10 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                   <span className="sort" onClick={() => toggleSort("qty")}>Qty <span className="icon">{sortIcon("qty")}</span></span>
                 </th>
                 <th style={{ minWidth: 200 }}>Location</th>
-                <th style={{ width: 140 }}>
+                <th style={{ width: 110 }}>
                   <span className="sort" onClick={() => toggleSort("mfg")}>Manufacturer <span className="icon">{sortIcon("mfg")}</span></span>
                 </th>
-                <th style={{ minWidth: 200 }}>Notes</th>
+                <th style={{ width: 160 }}>Notes</th>
                 <th style={{ width: 80 }}>Datasheet</th>
                 <th style={{ width: 36 }}></th>
               </tr>
@@ -2267,7 +2267,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                       )}
                     </td>
                     <td><LocPath id={p.loc} /></td>
-                    <td>
+                    <td style={{ maxWidth: 110, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {isEdit("mfg") ? (
                         <input
                           className="cell-input" autoFocus defaultValue={p.mfg}
@@ -2278,7 +2278,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                         <span onDoubleClick={() => setEditing({ id: p.id, field: "mfg" })}>{p.mfg}</span>
                       )}
                     </td>
-                    <td style={{ color: "var(--text-muted)", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <td style={{ color: "var(--text-muted)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {isEdit("notes") ? (
                         <input
                           className="cell-input" autoFocus defaultValue={p.notes || ""}
