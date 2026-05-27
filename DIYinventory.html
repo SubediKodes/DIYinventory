@@ -3079,7 +3079,7 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
         body: JSON.stringify({
           model: "deepseek-chat",
-          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return ONLY a JSON object (no markdown) with these exact fields:\n- name: canonical expanded name, never echo the input verbatim (e.g. "bc547" → "BC547 NPN General Purpose Transistor")\n- cat: must be exactly one of: ${catList}\n- value: component value (e.g. "1 kΩ", "100 nF", "5V 1A")\n- pkg: package (e.g. "TO-92", "0805", "DIP-8", "Axial")\n- mfg: typical manufacturer name\n- mpn: real manufacturer part number\n- notes: one-line description\n- imageUrl: a real direct image URL for this component — use image URLs you know from training data such as manufacturer product page images, Digikey CDN (https://media.digikey.com/photos/...), Mouser, or LCSC (https://assets.lcsc.com/images/lcsc/...). Return empty string only for completely unknown parts.` }],
+          messages: [{ role: "user", content: `Identify this electronic component: "${form.name}". Return ONLY a JSON object (no markdown) with these exact fields:\n- name: canonical expanded name, never echo the input verbatim (e.g. "bc547" → "BC547 NPN General Purpose Transistor")\n- cat: must be exactly one of: ${catList}\n- value: component value (e.g. "1 kΩ", "100 nF", "5V 1A")\n- pkg: package (e.g. "TO-92", "0805", "DIP-8", "Axial")\n- mfg: typical manufacturer name\n- mpn: real manufacturer part number\n- notes: one-line description` }],
           response_format: { type: "json_object" }
         })
       });
@@ -3098,7 +3098,6 @@ function AddPartDrawer({ open, onClose, onCreate, onUpdate, initialName, initial
         mfg: p.mfg || f.mfg,
         mpn: p.mpn || f.mpn,
         notes: p.notes || f.notes,
-        imageUrl: p.imageUrl || f.imageUrl,
       }));
     } catch (e) {
       setAiError(e.message);
