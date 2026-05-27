@@ -2251,7 +2251,7 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                       )}
                     </td>
                     <td><CatChip cat={p.cat} /></td>
-                    <td className="cell-num">
+                    <td className="cell-num" style={{ padding: "0 8px" }}>
                       {isEdit("qty") ? (
                         <input
                           className="cell-input cell-num" type="number" autoFocus
@@ -2260,12 +2260,14 @@ function PartsList({ parts, navigate, updatePart, deletePart, openAdd, openEdit,
                           onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setEditing(null); }}
                         />
                       ) : (
-                        <span className="qty" onDoubleClick={() => setEditing({ id: p.id, field: "qty" })}>
-                          <button className="step" onClick={(e) => { e.stopPropagation(); updatePart(p.id, { qty: Math.max(0, p.qty - 1) }); }}>−</button>
-                          <span className="v">{p.qty}</span>
-                          <button className="step" onClick={(e) => { e.stopPropagation(); updatePart(p.id, { qty: p.qty + 1 }); }}>+</button>
-                          {st.kind !== "ok" && <span style={{ marginLeft: 6 }} className={"chip " + st.kind}>{st.label}</span>}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6 }}>
+                          <span>{st.kind !== "ok" ? <span className={"chip " + st.kind}>{st.label}</span> : null}</span>
+                          <span className="qty" onDoubleClick={() => setEditing({ id: p.id, field: "qty" })}>
+                            <button className="step" onClick={(e) => { e.stopPropagation(); updatePart(p.id, { qty: Math.max(0, p.qty - 1) }); }}>−</button>
+                            <span className="v">{p.qty}</span>
+                            <button className="step" onClick={(e) => { e.stopPropagation(); updatePart(p.id, { qty: p.qty + 1 }); }}>+</button>
+                          </span>
+                        </div>
                       )}
                     </td>
                     <td><LocPath id={p.loc} /></td>
