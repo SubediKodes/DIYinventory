@@ -1326,7 +1326,7 @@ window.icons = icons;
 /* global React */
 // Seed data for the prototype.
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   { id: "resistor",   label: "Resistors",    color: "#d97706", icon: "resistor" },
   { id: "capacitor",  label: "Capacitors",   color: "#2563eb", icon: "capacitor" },
   { id: "inductor",   label: "Inductors",    color: "#0284c7", icon: "misc" },
@@ -1350,7 +1350,7 @@ const CATEGORIES = [
 ];
 
 // Storage hierarchy: workshop -> shelf -> drawer -> bin
-const LOCATIONS = [
+const DEFAULT_LOCATIONS = [
   {
     id: "lab",
     name: "Lab Bench",
@@ -1418,7 +1418,7 @@ function buildLocIndex(nodes, trail = [], out = {}) {
   }
   return out;
 }
-const LOC_INDEX = buildLocIndex(LOCATIONS);
+const LOC_INDEX = buildLocIndex(DEFAULT_LOCATIONS);
 
 let _idc = 0;
 const uid = () => `p${(++_idc).toString().padStart(3, "0")}`;
@@ -1581,8 +1581,8 @@ function extractAmazonImage(url) {
   return `https://images-na.ssl-images-amazon.com/images/P/${m[1]}.01.LZZZZZZZ.jpg`;
 }
 
-window.CATEGORIES = CATEGORIES;
-window.LOCATIONS = LOCATIONS;
+window.CATEGORIES = DEFAULT_CATEGORIES;
+window.LOCATIONS = DEFAULT_LOCATIONS;
 window.LOC_INDEX = LOC_INDEX;
 window.PARTS = PARTS;
 window.PROJECTS = PROJECTS;
@@ -1600,7 +1600,7 @@ window.extractAmazonImage = extractAmazonImage;
 
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-function Sidebar({ page, setPage, partCounts, projects, theme, setTheme, mobileOpen, setMobileOpen, onOpenGistSettings, ghToken, syncStatus }) {
+function Sidebar({ page, setPage, partCounts, projects, theme, setTheme, mobileOpen, setMobileOpen, onOpenGistSettings, onOpenCatMgr, ghToken, syncStatus }) {
   return (
     <aside className={"sidebar" + (mobileOpen ? " open" : "")}>
       <div className="sidebar-brand">
@@ -1621,7 +1621,10 @@ function Sidebar({ page, setPage, partCounts, projects, theme, setTheme, mobileO
       <NavItem ic="storage" label="Storage" active={page === "storage"} onClick={() => { setPage("storage"); setMobileOpen(false); }} />
       <NavItem ic="project" label="Projects" count={projects.length} active={page === "projects"} onClick={() => { setPage("projects"); setMobileOpen(false); }} />
 
-      <div className="sidebar-section">Categories</div>
+      <div className="sidebar-section" style={{ display: "flex", alignItems: "center" }}>
+        <span style={{ flex: 1 }}>Categories</span>
+        <button className="icon-btn" style={{ width: 20, height: 20, marginRight: 2 }} title="Manage categories" onClick={onOpenCatMgr}>{icons.edit}</button>
+      </div>
       {window.CATEGORIES.filter(c => (partCounts.byCat[c.id] || 0) > 0).map(c => (
         <button
           key={c.id}
@@ -1889,7 +1892,7 @@ Object.assign(window, { Sidebar, Topbar, CommandPalette, Toasts, MobileNav });
   </script>
 
   <script type="text/babel">
-/* global React, icons, Ic, CATEGORIES, LOC_INDEX, PARTS, PROJECTS, genHistory, extractAmazonImage */
+/* global React, icons, Ic, DEFAULT_CATEGORIES, LOC_INDEX, PARTS, PROJECTS, genHistory, extractAmazonImage */
 // Page-level components: Dashboard, PartsList, PartDetail, Storage, Projects/BOM
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -2443,7 +2446,7 @@ Object.assign(window, { Dashboard, PartsList, StatCard, CatChip, LocPath, status
   </script>
 
   <script type="text/babel">
-/* global React, icons, Ic, CATEGORIES, LOCATIONS, LOC_INDEX, PARTS, PROJECTS, genHistory, statusOf, effectiveMin, extractAmazonImage, CatChip, LocPath */
+/* global React, icons, Ic, DEFAULT_CATEGORIES, DEFAULT_LOCATIONS, LOC_INDEX, PARTS, PROJECTS, genHistory, statusOf, effectiveMin, extractAmazonImage, CatChip, LocPath */
 // Detail pages: PartDetail, Storage, Projects list, Project detail, AddPartDrawer
 
 const { useState, useEffect, useRef, useMemo } = React;
@@ -3543,12 +3546,81 @@ function ConfirmDeletePartModal({ part, projects, onConfirm, onClose }) {
   );
 }
 
-Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal });
+// ---------- Manage Categories Drawer ----------
+
+function ManageCategoriesDrawer({ open, onClose, categories, onAdd, onUpdate, onDelete }) {
+  const [editing, setEditing] = React.useState(null); // { id, label, color } | "new"
+  const [form, setForm] = React.useState({ label: "", color: "#6b7280" });
+
+  const openNew = () => { setForm({ label: "", color: "#6b7280" }); setEditing("new"); };
+  const openEdit = (c) => { setForm({ label: c.label, color: c.color }); setEditing(c.id); };
+  const closeEdit = () => setEditing(null);
+
+  const save = () => {
+    const label = form.label.trim();
+    if (!label) return;
+    if (editing === "new") {
+      const id = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      onAdd({ id: id + "_" + Math.random().toString(36).slice(2, 5), label, color: form.color, icon: "misc" });
+    } else {
+      onUpdate(editing, { label, color: form.color });
+    }
+    closeEdit();
+  };
+
+  if (!open) return null;
+  return (
+    <>
+      <div className="scrim" onClick={onClose} />
+      <aside className="drawer" style={{ width: 360 }}>
+        <div className="drawer-head">
+          <span className="drawer-title">Manage Categories</span>
+          <button className="icon-btn" onClick={onClose}>{icons.x}</button>
+        </div>
+        <div className="drawer-body" style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
+          {categories.map(c => (
+            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 8px", borderRadius: 6, background: "var(--bg-sunk)" }}>
+              <span style={{ width: 12, height: 12, borderRadius: "50%", background: c.color, flexShrink: 0 }} />
+              <span style={{ flex: 1, fontSize: 13 }}>{c.label}</span>
+              <button className="icon-btn" style={{ width: 26, height: 26 }} onClick={() => openEdit(c)}>{icons.edit}</button>
+              <button className="icon-btn" style={{ width: 26, height: 26, color: "var(--danger)" }} onClick={() => onDelete(c.id)}>{icons.trash}</button>
+            </div>
+          ))}
+          {editing && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8, padding: "12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg)" }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>{editing === "new" ? "New category" : "Edit category"}</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))}
+                  style={{ width: 32, height: 32, padding: 2, border: "1px solid var(--border)", borderRadius: 4, background: "none", cursor: "pointer" }} />
+                <input className="inp" style={{ flex: 1 }} placeholder="Category name" value={form.label}
+                  onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                  onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") closeEdit(); }}
+                  autoFocus />
+              </div>
+              <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                <button className="btn" onClick={closeEdit}>Cancel</button>
+                <button className="btn primary" onClick={save}>Save</button>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="drawer-foot">
+          <button className="btn" style={{ marginRight: "auto" }} onClick={openNew}>
+            <span className="icon">{icons.plus}</span>Add category
+          </button>
+          <button className="btn primary" onClick={onClose}>Done</button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+Object.assign(window, { PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, ManageCategoriesDrawer });
 
   </script>
 
   <script type="text/babel">
-/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, MobileNav, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
+/* global React, ReactDOM, icons, Sidebar, Topbar, CommandPalette, Toasts, MobileNav, Dashboard, PartsList, PartDetail, Storage, ProjectsPage, ProjectDetail, AddPartDrawer, AddProjectDrawer, AddBomLineDrawer, ConfirmDeletePartModal, ManageCategoriesDrawer, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakToggle, useTweaks, buildLocIndex, addChildToTree, renameInTree, removeFromTree */
 
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -3661,6 +3733,12 @@ function App() {
       return saved ? JSON.parse(saved) : window.LOCATIONS;
     } catch { return window.LOCATIONS; }
   });
+  const [categories, setCategories] = useState(() => {
+    try {
+      const saved = localStorage.getItem("diy-categories");
+      return saved ? JSON.parse(saved) : window.CATEGORIES;
+    } catch { return window.CATEGORIES; }
+  });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
@@ -3672,6 +3750,7 @@ function App() {
   const [toasts, setToasts] = useState([]);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [gistOpen, setGistOpen] = useState(false);
+  const [catMgrOpen, setCatMgrOpen] = useState(false);
   const [ghToken, setGhToken] = useState(() => localStorage.getItem("diy-gh-token") || "");
   const [gistId, setGistId] = useState(() => localStorage.getItem("diy-gist-id") || "");
   const [syncStatus, setSyncStatus] = useState(null);
@@ -3703,6 +3782,11 @@ function App() {
     localStorage.setItem("diy-locations", JSON.stringify(locations));
   }, [locations]);
 
+  useEffect(() => {
+    localStorage.setItem("diy-categories", JSON.stringify(categories));
+    window.CATEGORIES = categories;
+  }, [categories]);
+
   const locIndex = useMemo(() => buildLocIndex(locations), [locations]);
   useEffect(() => { window.LOC_INDEX = locIndex; }, [locIndex]);
 
@@ -3717,7 +3801,7 @@ function App() {
       setSyncStatus({ ok: true, msg: "Syncing…" });
       try {
         let id = gistId;
-        const body = { description: "DIYinventory parts", public: false, files: { "parts.json": { content: JSON.stringify(parts, null, 2) }, "projects.json": { content: JSON.stringify(projects, null, 2) } } };
+        const body = { description: "DIYinventory parts", public: false, files: { "parts.json": { content: JSON.stringify(parts, null, 2) }, "projects.json": { content: JSON.stringify(projects, null, 2) }, "categories.json": { content: JSON.stringify(categories, null, 2) }, "locations.json": { content: JSON.stringify(locations, null, 2) } } };
         if (!id) {
           const res = await fetch("https://api.github.com/gists", { method: "POST", headers: { Authorization: `Bearer ${ghToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
           if (!res.ok) throw new Error(`GitHub ${res.status}`);
@@ -3734,7 +3818,7 @@ function App() {
         setSyncStatus({ ok: false, msg: `Sync failed: ${err.message}` });
       }
     }, 1500);
-  }, [parts, projects, ghToken, gistId]);
+  }, [parts, projects, categories, locations, ghToken, gistId]);
 
   // On load: pull latest from Gist if token + id are set
   useEffect(() => {
@@ -3748,6 +3832,10 @@ function App() {
         if (content) setParts(JSON.parse(content));
         const projContent = data.files?.["projects.json"]?.content;
         if (projContent) setProjects(JSON.parse(projContent));
+        const catContent = data.files?.["categories.json"]?.content;
+        if (catContent) setCategories(JSON.parse(catContent));
+        const locContent = data.files?.["locations.json"]?.content;
+        if (locContent) setLocations(JSON.parse(locContent));
         if (content || projContent) setSyncStatus({ ok: true, msg: `Loaded from Gist ${gistId.slice(0, 8)}…` });
       } catch {}
     })();
@@ -3775,8 +3863,12 @@ function App() {
         const data = await res.json();
         const content = data.files?.["parts.json"]?.content;
         const projContent = data.files?.["projects.json"]?.content;
+        const catContent = data.files?.["categories.json"]?.content;
+        const locContent = data.files?.["locations.json"]?.content;
         if (content) setParts(JSON.parse(content));
         if (projContent) setProjects(JSON.parse(projContent));
+        if (catContent) setCategories(JSON.parse(catContent));
+        if (locContent) setLocations(JSON.parse(locContent));
         setSyncStatus({ ok: true, msg: `Loaded from Gist ${id.slice(0, 8)}… ✓` });
         addToast({ title: "Gist sync connected", desc: "Data loaded from Gist" });
       } catch (err) {
@@ -3937,6 +4029,18 @@ function App() {
     setLocations(locs => removeFromTree(locs, id));
   }, []);
 
+  const addCategory = useCallback((cat) => {
+    setCategories(cs => [...cs, cat]);
+  }, []);
+
+  const updateCategory = useCallback((id, changes) => {
+    setCategories(cs => cs.map(c => c.id === id ? { ...c, ...changes } : c));
+  }, []);
+
+  const deleteCategory = useCallback((id) => {
+    setCategories(cs => cs.filter(c => c.id !== id));
+  }, []);
+
   // Counts for sidebar
   const partCounts = useMemo(() => {
     const byCat = {};
@@ -4021,6 +4125,7 @@ function App() {
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
         onOpenGistSettings={() => setGistOpen(true)}
+        onOpenCatMgr={() => setCatMgrOpen(true)}
         ghToken={ghToken}
         syncStatus={syncStatus}
       />
@@ -4074,6 +4179,7 @@ function App() {
       />
 
       <MobileNav page={page} setPage={setPage} />
+      <ManageCategoriesDrawer open={catMgrOpen} onClose={() => setCatMgrOpen(false)} categories={categories} onAdd={addCategory} onUpdate={updateCategory} onDelete={deleteCategory} />
       <Toasts toasts={toasts} dismiss={dismissToast} />
 
       <TweaksPanel title="Tweaks">
